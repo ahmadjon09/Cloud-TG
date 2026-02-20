@@ -1,0 +1,15 @@
+tg-cloud/
+  src/
+    index.js
+    bot.js
+    server.js
+    db.js
+    tg.js
+    authWebApp.js
+    models/
+      User.js
+      File.js
+  public/
+    app.html
+  package.json
+  .env

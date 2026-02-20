@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Cloud</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: system-ui, Arial;
+            margin: 0;
+            padding: 16px;
+        }
+
+        .top {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .btn {
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 10px;
+        }
+
+        .card {
+            border: 1px solid #eee;
+            border-radius: 14px;
+            padding: 12px;
+            margin: 10px 0;
+        }
+
+        .muted {
+            opacity: .7;
+            font-size: 12px;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        input,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #ddd;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .4);
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal>div {
+            width: min(520px, 92vw);
+            background: #fff;
+            border-radius: 16px;
+            padding: 14px;
+        }
+
+        .spin {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid #ccc;
+            border-top-color: #000;
+            border-radius: 50%;
+            animation: s 0.8s linear infinite;
+        }
+
+        @keyframes s {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="top">
+        <div>
+            <div id="who"></div>
+            <div class="muted" id="status"></div>
+        </div>
+        <div class="row">
+            <button class="btn" id="refresh">Refresh</button>
+        </div>
+    </div>
+
+    <div id="list"></div>
+
+    <div class="modal" id="modal">
+        <div>
+            <div class="row" style="justify-content:space-between;align-items:center;">
+                <b>Edit file</b>
+                <button class="btn" id="close">Close</button>
+            </div>
+            <div style="height:10px"></div>
+            <div class="muted">Name</div>
+            <input id="m_name" />
+            <div style="height:10px"></div>
+            <div class="muted">Note</div>
+            <textarea id="m_note" rows="4"></textarea>
+            <div style="height:10px"></div>
+            <div class="row">
+                <button class="btn" id="save">Save</button>
+                <button class="btn" id="download">Download</button>
+            </div>
+            <div style="height:10px"></div>
+            <div class="muted" id="m_meta"></div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram?.WebApp;
+        tg?.ready();
+        tg?.expand();
+
+        const initData = tg?.initData || "";
+        const user = tg?.initDataUnsafe?.user;
+
+        const who = document.getElementById("who");
+        who.textContent = user ? `@${user.username || ""} (${user.id})` : "Unknown";
+
+        const status = document.getElementById("status");
+        const list = document.getElementById("list");
+
+        const modal = document.getElementById("modal");
+        const closeBtn = document.getElementById("close");
+        const saveBtn = document.getElementById("save");
+        const dlBtn = document.getElementById("download");
+        const mName = document.getElementById("m_name");
+        const mNote = document.getElementById("m_note");
+        const mMeta = document.getElementById("m_meta");
+
+        let currentId = null;
+
+        function setStatus(text, loading = false) {
+            status.innerHTML = loading ? `<span class="spin"></span> ${text}` : text;
+        }
+
+        async function api(path, opts = {}) {
+            const headers = Object.assign({}, opts.headers || {}, {
+                "x-telegram-init-data": initData,
+                "content-type": "application/json"
+            });
+            const r = await fetch(path, { ...opts, headers });
+            if (!r.ok) throw new Error(await r.text());
+            return r.json();
+        }
+
+        function fmtSize(n) {
+            if (!n) return "0 B";
+            const u = ["B", "KB", "MB", "GB"];
+            let i = 0;
+            while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+            return `${n.toFixed(i ? 2 : 0)} ${u[i]}`;
+        }
+
+        function openModal(item) {
+            currentId = item.id;
+            mName.value = item.fileName || "";
+            mNote.value = item.note || "";
+            mMeta.textContent = `${item.kind} • ${fmtSize(item.fileSize)} • ${new Date(item.createdAt).toLocaleString()}`;
+            modal.style.display = "flex";
+        }
+
+        function closeModal() {
+            modal.style.display = "none";
+            currentId = null;
+        }
+
+        closeBtn.onclick = closeModal;
+        modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+
+        async function load() {
+            setStatus("Loading files...", true);
+            list.innerHTML = "";
+            try {
+                const items = await api("/api/files");
+                if (!items.length) {
+                    list.innerHTML = `<div class="muted">No files yet. Send files to the bot.</div>`;
+                } else {
+                    for (const it of items) {
+                        const el = document.createElement("div");
+                        el.className = "card";
+                        el.innerHTML = `
+              <div class="row" style="justify-content:space-between;align-items:center;">
+                <b>${(it.fileName || "(no name)").replaceAll("<", "&lt;")}</b>
+                <button class="btn">Edit</button>
+              </div>
+              <div class="muted">${it.kind} • ${fmtSize(it.fileSize)} • ${new Date(it.createdAt).toLocaleString()}</div>
+              <div class="muted">${(it.note || "").replaceAll("<", "&lt;")}</div>
+            `;
+                        el.querySelector("button").onclick = () => openModal(it);
+                        list.appendChild(el);
+                    }
+                }
+                setStatus("Ready.");
+            } catch (e) {
+                setStatus("Failed to load.");
+                list.innerHTML = `<div class="card"><b>Error</b><div class="muted">${String(e).replaceAll("<", "&lt;")}</div></div>`;
+            }
+        }
+
+        document.getElementById("refresh").onclick = load;
+
+        saveBtn.onclick = async () => {
+            if (!currentId) return;
+            setStatus("Saving...", true);
+            try {
+                await api(`/api/files/${currentId}`, {
+                    method: "PATCH",
+                    body: JSON.stringify({ fileName: mName.value, note: mNote.value })
+                });
+                closeModal();
+                await load();
+            } catch {
+                setStatus("Save failed.");
+            }
+        };
+
+        dlBtn.onclick = () => {
+            if (!currentId) return;
+            // download as normal navigation; initData is sent in query too (optional)
+            const url = `/api/files/${currentId}/download?initData=${encodeURIComponent(initData)}`;
+            window.location.href = url;
+        };
+
+        load();
+    </script>
+</body>
+
+</html>
