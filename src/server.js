@@ -12,6 +12,7 @@ export function startServer() {
     const app = express();
     app.use(express.json({ limit: "1mb" }));
 
+    app.get('/hello', (_, res) => res.send('Hello!'))
     // Static HTML (single big page)
     app.use("/public", express.static(path.join(__dirname, "..", "public"), {
         setHeaders(res) {
