@@ -11,15 +11,19 @@ const __dirname = path.dirname(__filename);
 export function startServer() {
     const app = express();
     app.use(express.json({ limit: "1mb" }));
-    app.use((req, res, next) => {
+    app.use((_, res, next) => {
         res.setHeader(
             "Content-Security-Policy",
-            "default-src 'self'; " +
-            "script-src 'self' 'unsafe-inline' https://telegram.org; " +
-            "style-src 'self' 'unsafe-inline'; " +
-            "connect-src 'self'; " +
-            "img-src 'self' data: blob:; " +
-            "frame-ancestors https://web.telegram.org https://t.me"
+            [
+                "default-src 'self'",
+                "script-src 'self' 'unsafe-inline' https://telegram.org https://cdn.jsdelivr.net",
+                "script-src-elem 'self' 'unsafe-inline' https://telegram.org https://cdn.jsdelivr.net",
+                "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; " +
+                "font-src 'self' https://cdnjs.cloudflare.com; " +
+                "connect-src 'self' https: wss:",
+                "img-src 'self' data: blob:",
+                "frame-ancestors https://web.telegram.org https://t.me",
+            ].join("; ")
         );
         next();
     });
@@ -130,7 +134,7 @@ export function startServer() {
             res.status(500).json({ error: "Server error" });
         }
     });
-    
+
     const port = Number(process.env.PORT || 5000);
     app.listen(port, () => console.log("HTTP on", port));
 }
