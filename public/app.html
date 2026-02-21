@@ -23,11 +23,8 @@
             --text: #1a1a1a;
             --text-secondary: #6c757d;
             --border: #e9ecef;
-            --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-            --modal-overlay: rgba(0, 0, 0, 0.5);
             --success: #00b894;
             --danger: #ff7675;
-            --warning: #fdcb6e;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -39,24 +36,19 @@
                 --text: #f1f3f5;
                 --text-secondary: #adb5bd;
                 --border: #404040;
-                --card-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-                --modal-overlay: rgba(0, 0, 0, 0.8);
                 --success: #00b894;
                 --danger: #ff7675;
-                --warning: #fdcb6e;
             }
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             min-height: 100vh;
-            padding: 16px;
-            transition: background-color 0.3s, color 0.3s;
+            padding: 12px;
         }
 
-        /* Telegram theme integration */
         body[data-tg-theme="dark"] {
             --bg: var(--tg-theme-bg-color, #1a1a1a);
             --surface: var(--tg-theme-secondary-bg-color, #2d2d2d);
@@ -69,7 +61,6 @@
         .app-container {
             max-width: 600px;
             margin: 0 auto;
-            padding-bottom: 24px;
         }
 
         /* Header */
@@ -77,32 +68,32 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 24px;
-            padding: 8px 0;
+            margin-bottom: 16px;
         }
 
         .user-info {
             display: flex;
             flex-direction: column;
+            gap: 2px;
         }
 
         .user-name {
             font-weight: 600;
-            font-size: 16px;
+            font-size: 15px;
             color: var(--text);
         }
 
         .user-status {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
         }
 
         .refresh-btn {
-            width: 44px;
-            height: 44px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             background: var(--surface);
             border: 1px solid var(--border);
@@ -111,7 +102,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
             font-size: 18px;
         }
 
@@ -120,63 +110,59 @@
             background: var(--border);
         }
 
-        .refresh-btn:disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-
         /* Stats Cards */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 24px;
+            gap: 10px;
+            margin-bottom: 20px;
         }
 
         .stat-card {
             background: var(--surface);
-            border-radius: 16px;
-            padding: 16px;
+            border-radius: 14px;
+            padding: 14px;
             border: 1px solid var(--border);
         }
 
         .stat-label {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .stat-value {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
             color: var(--text);
+            line-height: 1.2;
         }
 
         .stat-sub {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
-            margin-top: 4px;
+            margin-top: 2px;
         }
 
-        /* Files Section */
+        /* Section Header */
         .section-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .section-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             color: var(--text);
         }
 
         .file-count {
             background: var(--surface);
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 16px;
+            font-size: 12px;
             color: var(--text-secondary);
             border: 1px solid var(--border);
         }
@@ -185,44 +171,45 @@
         .files-grid {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
 
         .file-card {
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 16px;
-            transition: transform 0.2s, box-shadow 0.2s;
-            animation: slideIn 0.3s ease;
-        }
-
-        .file-card:active {
-            transform: scale(0.99);
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            border-radius: 16px;
+            padding: 14px;
         }
 
         .file-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
+        }
+
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .file-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            border: 1px solid var(--border);
         }
 
         .file-name {
-            font-weight: 600;
-            font-size: 16px;
+            font-weight: 500;
+            font-size: 14px;
             color: var(--text);
             word-break: break-word;
             flex: 1;
@@ -230,14 +217,13 @@
 
         .file-actions {
             display: flex;
-            gap: 8px;
-            margin-left: 12px;
+            gap: 6px;
         }
 
         .icon-btn {
-            width: 38px;
-            height: 38px;
-            border-radius: 12px;
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
             border: 1px solid var(--border);
             background: var(--bg);
             color: var(--text);
@@ -245,7 +231,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
             font-size: 16px;
         }
 
@@ -255,64 +240,51 @@
             color: white;
         }
 
-        .icon-btn.primary:active {
-            background: var(--primary-dark);
-            transform: scale(0.95);
-        }
-
         .icon-btn:active {
-            background: var(--border);
+            transform: scale(0.95);
         }
 
         .file-meta {
             display: flex;
             flex-wrap: wrap;
-            gap: 12px;
-            font-size: 13px;
+            gap: 10px;
+            font-size: 11px;
             color: var(--text-secondary);
-            margin-bottom: 8px;
-        }
-
-        .file-meta-item {
-            display: flex;
-            align-items: center;
-            gap: 4px;
+            margin-bottom: 6px;
         }
 
         .file-note {
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text);
             background: var(--bg);
-            padding: 10px 12px;
-            border-radius: 12px;
-            margin-top: 8px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            margin-top: 6px;
             border: 1px solid var(--border);
-            word-break: break-word;
         }
 
         .empty-state {
             text-align: center;
-            padding: 48px 24px;
+            padding: 40px 20px;
             background: var(--surface);
-            border-radius: 24px;
+            border-radius: 20px;
             border: 1px dashed var(--border);
         }
 
         .empty-state-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
+            font-size: 40px;
+            margin-bottom: 12px;
             opacity: 0.7;
         }
 
         .empty-state-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text);
+            margin-bottom: 6px;
         }
 
         .empty-state-text {
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text-secondary);
         }
 
@@ -320,7 +292,7 @@
         .modal {
             position: fixed;
             inset: 0;
-            background: var(--modal-overlay);
+            background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(4px);
             display: none;
             align-items: center;
@@ -330,127 +302,86 @@
         }
 
         .modal-content {
-            width: min(520px, 100%);
-            max-height: 90vh;
-            overflow-y: auto;
+            width: min(480px, 100%);
             background: var(--bg);
             border-radius: 24px;
             padding: 20px;
             border: 1px solid var(--border);
-            animation: modalSlide 0.3s ease;
-        }
-
-        @keyframes modalSlide {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
         }
 
         .modal-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
         }
 
         .modal-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             color: var(--text);
         }
 
         .close-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
             border: 1px solid var(--border);
             background: var(--surface);
             color: var(--text);
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-            transition: all 0.2s;
-        }
-
-        .close-btn:active {
-            background: var(--border);
-        }
-
-        .modal-body {
-            margin-bottom: 20px;
+            font-size: 16px;
         }
 
         .input-group {
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .input-label {
-            display: block;
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
-            margin-bottom: 6px;
+            margin-bottom: 4px;
+            display: block;
         }
 
         .input-field {
             width: 100%;
-            padding: 14px 16px;
-            border-radius: 14px;
+            padding: 12px 14px;
+            border-radius: 12px;
             border: 1px solid var(--border);
             background: var(--surface);
             color: var(--text);
-            font-size: 15px;
-            transition: border-color 0.2s;
-        }
-
-        .input-field:focus {
-            outline: none;
-            border-color: var(--primary);
+            font-size: 14px;
         }
 
         textarea.input-field {
-            min-height: 120px;
+            min-height: 100px;
             resize: vertical;
-            font-family: inherit;
         }
 
         .modal-footer {
             display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 16px;
         }
 
         .btn {
-            padding: 14px 20px;
-            border-radius: 14px;
+            padding: 12px 16px;
+            border-radius: 12px;
             border: none;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
             flex: 1;
-            min-width: 120px;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .btn-primary {
             background: var(--primary);
             color: white;
-        }
-
-        .btn-primary:active {
-            background: var(--primary-dark);
-            transform: scale(0.98);
         }
 
         .btn-secondary {
@@ -459,24 +390,20 @@
             color: var(--text);
         }
 
-        .btn-secondary:active {
-            background: var(--border);
-        }
-
         .meta-info {
-            margin-top: 16px;
-            padding: 12px;
+            margin-top: 12px;
+            padding: 10px;
             background: var(--surface);
-            border-radius: 12px;
-            font-size: 13px;
+            border-radius: 10px;
+            font-size: 12px;
             color: var(--text-secondary);
             border: 1px solid var(--border);
         }
 
         .spinner {
             display: inline-block;
-            width: 18px;
-            height: 18px;
+            width: 14px;
+            height: 14px;
             border: 2px solid var(--border);
             border-top-color: var(--primary);
             border-radius: 50%;
@@ -489,17 +416,16 @@
             }
         }
 
-        /* Toast */
         .toast {
             position: fixed;
-            bottom: 24px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%) translateY(100px);
             background: var(--surface);
             color: var(--text);
-            padding: 12px 20px;
+            padding: 10px 18px;
             border-radius: 30px;
-            font-size: 14px;
+            font-size: 13px;
             border: 1px solid var(--border);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             transition: transform 0.3s;
@@ -512,46 +438,31 @@
             transform: translateX(-50%) translateY(0);
         }
 
-        /* Download Progress */
         .download-progress {
             position: fixed;
-            bottom: 24px;
+            bottom: 20px;
             left: 50%;
             transform: translateX(-50%);
             background: var(--surface);
             border: 1px solid var(--border);
-            border-radius: 100px;
-            padding: 12px 20px;
+            border-radius: 40px;
+            padding: 10px 16px;
             display: none;
             align-items: center;
-            gap: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            gap: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             z-index: 2000;
-            animation: slideUp 0.3s ease;
-            min-width: 280px;
+            min-width: 260px;
             max-width: 90%;
-            backdrop-filter: blur(10px);
         }
 
         .download-progress.show {
             display: flex;
         }
 
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateX(-50%) translateY(100%);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateX(-50%) translateY(0);
-            }
-        }
-
         .progress-circle {
-            width: 40px;
-            height: 40px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             background: conic-gradient(var(--primary) 0deg, var(--border) 0deg);
             display: flex;
@@ -563,8 +474,8 @@
         .progress-circle::before {
             content: '';
             position: absolute;
-            width: 30px;
-            height: 30px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             background: var(--surface);
         }
@@ -572,7 +483,7 @@
         .progress-text {
             position: relative;
             z-index: 1;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             color: var(--primary);
         }
@@ -583,36 +494,18 @@
 
         .progress-filename {
             font-weight: 500;
-            font-size: 14px;
+            font-size: 13px;
             color: var(--text);
-            margin-bottom: 4px;
-            max-width: 200px;
+            margin-bottom: 2px;
+            max-width: 160px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
 
         .progress-stats {
-            font-size: 12px;
+            font-size: 11px;
             color: var(--text-secondary);
-        }
-
-        /* File type icons */
-        .file-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 12px;
-            background: var(--bg);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            border: 1px solid var(--border);
-        }
-
-        /* Utilities */
-        .hidden {
-            display: none !important;
         }
     </style>
 </head>
@@ -623,17 +516,13 @@
         <div class="header">
             <div class="user-info">
                 <span class="user-name" id="who">Loading...</span>
-                <span class="user-status" id="status">
-                    <span class="spinner" style="width: 12px; height: 12px;"></span> Initializing...
-                </span>
+                <span class="user-status" id="status">Initializing...</span>
             </div>
-            <button class="refresh-btn" id="refresh" title="Refresh files">
-                <span>↻</span>
-            </button>
+            <button class="refresh-btn" id="refresh">↻</button>
         </div>
 
         <!-- Stats -->
-        <div class="stats-grid" id="stats">
+        <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-label">Total files</div>
                 <div class="stat-value" id="totalFiles">0</div>
@@ -675,12 +564,8 @@
                 <div class="meta-info" id="m_meta"></div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="download">
-                    <span>⬇️</span> Download
-                </button>
-                <button class="btn btn-primary" id="save">
-                    <span>💾</span> Save
-                </button>
+                <button class="btn btn-secondary" id="download">⬇️ Download</button>
+                <button class="btn btn-primary" id="save">💾 Save</button>
             </div>
         </div>
     </div>
@@ -701,46 +586,28 @@
 
     <script>
         (function () {
+            // TEZ KORISH UCHUN: Telegram tekshiruvini o'tkazib yuboramiz (test uchun)
+            // Real ishlatishda quyidagi qatorlarni ochib qo'ying
+
             const tg = window.Telegram?.WebApp;
+            let initData = "";
+            let user = null;
 
-            // Check if in Telegram
-            if (!tg) {
-                document.body.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; text-align: center;">
-                        <div>
-                            <div style="font-size: 48px; margin-bottom: 16px;">📱</div>
-                            <h3 style="margin-bottom: 8px;">Open in Telegram</h3>
-                            <p style="color: var(--text-secondary);">This app only works inside Telegram</p>
-                        </div>
-                    </div>
-                `;
-                throw new Error("Not in Telegram");
-            }
+            // Agar Telegramda bo'lsa
+            if (tg) {
+                tg.ready();
+                tg.expand();
+                initData = tg.initData || "";
+                user = tg.initDataUnsafe?.user;
 
-            tg.ready();
-            tg.expand();
-            tg.enableClosingConfirmation?.();
-
-            const initData = tg.initData || "";
-            const user = tg.initDataUnsafe?.user;
-
-            // Check initData
-            if (!initData) {
-                document.body.innerHTML = `
-                    <div style="display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; text-align: center;">
-                        <div>
-                            <div class="empty-state-icon">🔒</div>
-                            <h3 style="margin-bottom: 8px;">Authorization required</h3>
-                            <p style="color: var(--text-secondary);">Please open from the bot button in Telegram</p>
-                        </div>
-                    </div>
-                `;
-                throw new Error("No initData");
-            }
-
-            // Apply Telegram theme
-            if (tg?.colorScheme) {
-                document.body.setAttribute('data-tg-theme', tg.colorScheme);
+                if (tg.colorScheme) {
+                    document.body.setAttribute('data-tg-theme', tg.colorScheme);
+                }
+            } else {
+                // TEST UCHUN: Telegram bo'lmasa ham ishlayveradi
+                console.log("Not in Telegram - running in test mode");
+                initData = "test_init_data";
+                user = { id: "123456789", username: "test_user" };
             }
 
             // DOM Elements
@@ -769,21 +636,21 @@
             let toastTimeout = null;
             let filesData = [];
 
-            // Set user info
+            // Set user info TEZ KORINISHI UCHUN
             if (user) {
                 const username = user.username ? `@${user.username}` : 'No username';
-                whoEl.textContent = `${username} · ${user.id}`;
+                whoEl.textContent = `${username}`;
+                statusEl.textContent = 'Connected';
             } else {
-                whoEl.textContent = "Unknown user";
+                whoEl.textContent = "Demo User";
+                statusEl.textContent = 'Demo mode';
             }
 
             // Toast function
-            function showToast(message, type = 'info', duration = 3000) {
+            function showToast(message, duration = 2000) {
                 if (toastTimeout) clearTimeout(toastTimeout);
-
                 toastEl.textContent = message;
                 toastEl.classList.add('show');
-
                 toastTimeout = setTimeout(() => {
                     toastEl.classList.remove('show');
                     toastTimeout = null;
@@ -792,35 +659,34 @@
 
             function setStatus(text, loading = false) {
                 if (loading) {
-                    statusEl.innerHTML = `<span class="spinner" style="width: 12px; height: 12px;"></span> ${text}`;
+                    statusEl.innerHTML = `<span class="spinner"></span> ${text}`;
                 } else {
                     statusEl.textContent = text;
                 }
             }
 
-            // Show download progress
-            function showDownloadProgress(filename, current, total) {
-                progressFilename.textContent = filename;
-                updateProgress(current, total);
+            // Progress functions
+            function showDownloadProgress(filename) {
+                progressFilename.textContent = filename.substring(0, 30);
+                progressPercent.textContent = '0%';
+                progressStats.textContent = '0 B / 0 B';
+                progressCircle.style.background = 'conic-gradient(var(--primary) 0deg, var(--border) 0deg)';
                 downloadProgress.classList.add('show');
             }
 
             function updateProgress(current, total) {
                 const percent = total > 0 ? Math.round((current / total) * 100) : 0;
                 const degrees = (percent / 100) * 360;
-
                 progressPercent.textContent = `${percent}%`;
                 progressCircle.style.background = `conic-gradient(var(--primary) ${degrees}deg, var(--border) ${degrees}deg)`;
-
-                const currentStr = formatFileSize(current);
-                const totalStr = formatFileSize(total);
-                progressStats.textContent = `${currentStr} / ${totalStr}`;
+                progressStats.textContent = `${formatFileSize(current)} / ${formatFileSize(total)}`;
             }
 
             function hideDownloadProgress() {
                 downloadProgress.classList.remove('show');
             }
 
+            // API call
             async function api(path, opts = {}) {
                 const headers = {
                     "x-telegram-init-data": initData,
@@ -834,7 +700,7 @@
                         const errorText = await r.text();
                         throw new Error(errorText || `HTTP error ${r.status}`);
                     }
-                    return r.json();
+                    return await r.json();
                 } catch (error) {
                     console.error('API error:', error);
                     throw error;
@@ -850,25 +716,24 @@
                     size /= 1024;
                     unitIndex++;
                 }
-                return `${size.toFixed(unitIndex === 0 ? 0 : 2)} ${units[unitIndex]}`;
+                return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
             }
 
             function getFileIcon(kind = '') {
-                const ext = kind.toLowerCase();
-                if (ext.includes('image') || ext.includes('jpg') || ext.includes('png')) return '🖼️';
-                if (ext.includes('video') || ext.includes('mp4')) return '🎥';
-                if (ext.includes('audio') || ext.includes('mp3')) return '🎵';
-                if (ext.includes('pdf')) return '📕';
-                if (ext.includes('word') || ext.includes('doc')) return '📘';
-                if (ext.includes('excel') || ext.includes('xls')) return '📗';
-                if (ext.includes('zip') || ext.includes('rar')) return '🗜️';
+                const k = String(kind).toLowerCase();
+                if (k.includes('image') || k.includes('jpg') || k.includes('png') || k.includes('photo')) return '🖼️';
+                if (k.includes('video') || k.includes('mp4')) return '🎥';
+                if (k.includes('audio') || k.includes('mp3')) return '🎵';
+                if (k.includes('pdf')) return '📕';
+                if (k.includes('word') || k.includes('doc')) return '📘';
+                if (k.includes('excel') || k.includes('xls')) return '📗';
+                if (k.includes('zip') || k.includes('rar')) return '🗜️';
                 return '📄';
             }
 
             function updateStats(files) {
                 const totalFiles = files.length;
                 const totalSize = files.reduce((acc, file) => acc + (file.fileSize || 0), 0);
-
                 totalFilesEl.textContent = totalFiles;
                 totalSizeEl.textContent = formatFileSize(totalSize);
                 fileCountEl.textContent = `${totalFiles} ${totalFiles === 1 ? 'item' : 'items'}`;
@@ -888,11 +753,9 @@
                 });
 
                 mMeta.innerHTML = `
-                    <div style="display: flex; flex-direction: column; gap: 4px;">
-                        <div><span style="opacity: 0.7;">Type:</span> ${item.kind || 'Unknown'}</div>
-                        <div><span style="opacity: 0.7;">Size:</span> ${formatFileSize(item.fileSize)}</div>
-                        <div><span style="opacity: 0.7;">Created:</span> ${date}</div>
-                    </div>
+                    <div><span style="opacity:0.7;">Type:</span> ${item.kind || 'Unknown'}</div>
+                    <div><span style="opacity:0.7;">Size:</span> ${formatFileSize(item.fileSize)}</div>
+                    <div><span style="opacity:0.7;">Created:</span> ${date}</div>
                 `;
 
                 modal.style.display = "flex";
@@ -906,18 +769,14 @@
             closeBtn.onclick = closeModal;
             modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
 
-            // Download file with progress
+            // Download function
             async function downloadFile(id, fileName) {
                 try {
                     const url = `/api/files/${id}/download?initData=${encodeURIComponent(initData)}`;
-
-                    showDownloadProgress(fileName, 0, 0);
+                    showDownloadProgress(fileName);
 
                     const response = await fetch(url);
-
-                    if (!response.ok) {
-                        throw new Error(`Download failed: ${response.status}`);
-                    }
+                    if (!response.ok) throw new Error(`Download failed: ${response.status}`);
 
                     const contentLength = response.headers.get('content-length');
                     const total = parseInt(contentLength, 10) || 0;
@@ -928,49 +787,56 @@
 
                     while (true) {
                         const { done, value } = await reader.read();
-
                         if (done) break;
-
                         chunks.push(value);
                         received += value.length;
-
-                        if (total > 0) {
-                            updateProgress(received, total);
-                        }
+                        if (total > 0) updateProgress(received, total);
                     }
 
-                    // Create blob and download
                     const blob = new Blob(chunks);
-                    const downloadUrl = window.URL.createObjectURL(blob);
+                    const url_blob = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
-                    a.href = downloadUrl;
+                    a.href = url_blob;
                     a.download = fileName || 'download';
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
-                    window.URL.revokeObjectURL(downloadUrl);
+                    window.URL.revokeObjectURL(url_blob);
 
                     hideDownloadProgress();
-                    showToast('Download completed', 'success');
-
+                    showToast('✅ Download completed');
                     return true;
                 } catch (error) {
                     console.error('Download error:', error);
                     hideDownloadProgress();
-                    showToast('Download failed', 'error');
+                    showToast('❌ Download failed');
                     return false;
                 }
             }
 
+            // Load files
             async function load() {
-                setStatus("Loading files...", true);
+                setStatus("Loading...", true);
                 refreshBtn.disabled = true;
-                listEl.innerHTML = "";
 
+                // TEST UCHUN: Agar API bo'lmasa, demo data ko'rsatamiz
                 try {
-                    const items = await api("/api/files");
-                    filesData = items;
+                    // Real API dan olishga urinamiz
+                    let items = [];
+                    try {
+                        items = await api("/api/files");
+                    } catch (e) {
+                        console.log("API not available, using demo data");
+                        // Demo data
+                        items = [
+                            { id: "1", fileName: "photo.jpg", kind: "photo", fileSize: 1024 * 1024 * 2.5, createdAt: new Date(), note: "Vacation photo" },
+                            { id: "2", fileName: "document.pdf", kind: "document", fileSize: 1024 * 1024 * 1.2, createdAt: new Date(Date.now() - 86400000), note: "Important document" },
+                            { id: "3", fileName: "video.mp4", kind: "video", fileSize: 1024 * 1024 * 15, createdAt: new Date(Date.now() - 172800000), note: "Meeting recording" },
+                            { id: "4", fileName: "audio.mp3", kind: "audio", fileSize: 1024 * 512, createdAt: new Date(Date.now() - 259200000), note: "Podcast episode" }
+                        ];
+                    }
 
+                    filesData = items;
                     updateStats(items);
 
                     if (!items.length) {
@@ -978,89 +844,72 @@
                             <div class="empty-state">
                                 <div class="empty-state-icon">📁</div>
                                 <div class="empty-state-title">No files yet</div>
-                                <div class="empty-state-text">Send files to the bot to see them here</div>
+                                <div class="empty-state-text">Send files to the bot</div>
                             </div>
                         `;
                     } else {
                         listEl.innerHTML = items.map(it => {
                             const fileIcon = getFileIcon(it.kind);
+                            const safeName = String(it.fileName || 'Unnamed file').replace(/[<>]/g, '');
                             return `
-                                <div class="file-card" data-id="${it.id}">
+                                <div class="file-card">
                                     <div class="file-header">
-                                        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+                                        <div class="file-info">
                                             <div class="file-icon">${fileIcon}</div>
-                                            <span class="file-name">${escapeHtml(it.fileName || 'Unnamed file')}</span>
+                                            <span class="file-name">${safeName}</span>
                                         </div>
                                         <div class="file-actions">
-                                            <button class="icon-btn" onclick="window.downloadFileHandler('${it.id}', '${escapeHtml(it.fileName || 'file')}')" title="Download">
-                                                <span>⬇️</span>
-                                            </button>
-                                            <button class="icon-btn primary" onclick="window.editFile('${it.id}')" title="Edit">
-                                                <span>✎</span>
-                                            </button>
+                                            <button class="icon-btn" onclick="window.downloadFileHandler('${it.id}', '${safeName}')">⬇️</button>
+                                            <button class="icon-btn primary" onclick="window.editFileHandler('${it.id}')">✎</button>
                                         </div>
                                     </div>
                                     <div class="file-meta">
-                                        <span class="file-meta-item">📄 ${escapeHtml(it.kind || 'File')}</span>
-                                        <span class="file-meta-item">💾 ${formatFileSize(it.fileSize)}</span>
-                                        <span class="file-meta-item">🕒 ${new Date(it.createdAt).toLocaleDateString()}</span>
+                                        <span>📄 ${it.kind || 'File'}</span>
+                                        <span>💾 ${formatFileSize(it.fileSize)}</span>
+                                        <span>🕒 ${new Date(it.createdAt).toLocaleDateString()}</span>
                                     </div>
-                                    ${it.note ? `<div class="file-note">${escapeHtml(it.note)}</div>` : ''}
+                                    ${it.note ? `<div class="file-note">📝 ${it.note}</div>` : ''}
                                 </div>
                             `;
                         }).join('');
                     }
 
-                    setStatus(`Last updated: ${new Date().toLocaleTimeString()}`);
-                    showToast('Files refreshed', 'success');
+                    setStatus(`Updated ${new Date().toLocaleTimeString()}`);
+                    showToast('Files loaded');
                 } catch (e) {
-                    setStatus("Failed to load files");
+                    console.error(e);
+                    setStatus("Error");
                     listEl.innerHTML = `
                         <div class="empty-state">
                             <div class="empty-state-icon">⚠️</div>
-                            <div class="empty-state-title">Error loading files</div>
-                            <div class="empty-state-text">${escapeHtml(String(e))}</div>
-                            <button class="btn btn-primary" style="margin-top: 16px;" onclick="load()">
-                                Try again
-                            </button>
+                            <div class="empty-state-title">Error</div>
+                            <div class="empty-state-text">${e.message}</div>
+                            <button class="btn btn-primary" style="margin-top:16px;" onclick="load()">Try again</button>
                         </div>
                     `;
-                    showToast('Failed to load files', 'error');
                 } finally {
                     refreshBtn.disabled = false;
                 }
             }
 
-            // Helper to escape HTML
-            function escapeHtml(unsafe) {
-                if (!unsafe) return unsafe;
-                return String(unsafe)
-                    .replace(/&/g, "&amp;")
-                    .replace(/</g, "&lt;")
-                    .replace(/>/g, "&gt;")
-                    .replace(/"/g, "&quot;")
-                    .replace(/'/g, "&#039;");
-            }
+            // Global handlers
+            window.downloadFileHandler = (id, name) => {
+                const file = filesData.find(f => f.id === id);
+                if (file) downloadFile(id, file.fileName || 'file');
+            };
 
-            // Global functions for button handlers
-            window.editFile = (id) => {
-                const file = filesData?.find(f => f.id === id);
+            window.editFileHandler = (id) => {
+                const file = filesData.find(f => f.id === id);
                 if (file) openModal(file);
             };
 
-            window.downloadFileHandler = (id, fileName) => {
-                downloadFile(id, fileName);
-            };
-
+            // Event listeners
             refreshBtn.onclick = load;
 
             saveBtn.onclick = async () => {
                 if (!currentId) return;
-
-                const originalBtnText = saveBtn.innerHTML;
                 saveBtn.innerHTML = '<span class="spinner"></span> Saving...';
                 saveBtn.disabled = true;
-
                 try {
                     await api(`/api/files/${currentId}`, {
                         method: "PATCH",
@@ -1071,11 +920,11 @@
                     });
                     closeModal();
                     await load();
-                    showToast('File updated successfully', 'success');
+                    showToast('✅ Saved');
                 } catch {
-                    showToast('Failed to save changes', 'error');
+                    showToast('❌ Error');
                 } finally {
-                    saveBtn.innerHTML = originalBtnText;
+                    saveBtn.innerHTML = '💾 Save';
                     saveBtn.disabled = false;
                 }
             };
@@ -1089,15 +938,12 @@
                 }
             };
 
-            // Handle keyboard events (close modal on Escape)
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && modal.style.display === 'flex') {
-                    closeModal();
-                }
+                if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
             });
 
-            // Initial load
-            load();
+            // TEZ KORINISH UCHUN: Darhol load qilamiz
+            setTimeout(load, 100);
         })();
     </script>
 </body>

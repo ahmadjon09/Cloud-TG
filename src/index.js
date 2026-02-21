@@ -13,7 +13,7 @@ const keepServerAlive = () => {
 
     setInterval(() => {
         axios
-            .get(`process.env.BASE_URL/hello`)
+            .get(`${process.env.BASE_URL}/hello`)
             .then(() => console.log('🔄 Server active'))
             .catch(err => console.log('⚠️ Ping failed:', err.message))
     }, 10 * 60 * 1000)
