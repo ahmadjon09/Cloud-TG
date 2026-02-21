@@ -14,14 +14,12 @@ export function startServer() {
     app.use((req, res, next) => {
         res.setHeader(
             "Content-Security-Policy",
-            [
-                "default-src 'self'",
-                "script-src 'self' https://telegram.org",
-                "style-src 'self' 'unsafe-inline'",
-                "img-src 'self' data: blob:",
-                "connect-src 'self'",
-                "frame-ancestors https://web.telegram.org https://t.me"
-            ].join("; ")
+            "default-src 'self'; " +
+            "script-src 'self' 'unsafe-inline' https://telegram.org; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "connect-src 'self'; " +
+            "img-src 'self' data: blob:; " +
+            "frame-ancestors https://web.telegram.org https://t.me"
         );
         next();
     });
