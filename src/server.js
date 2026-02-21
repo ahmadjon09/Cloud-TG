@@ -11,7 +11,20 @@ const __dirname = path.dirname(__filename);
 export function startServer() {
     const app = express();
     app.use(express.json({ limit: "1mb" }));
-
+    app.use((req, res, next) => {
+        res.setHeader(
+            "Content-Security-Policy",
+            [
+                "default-src 'self'",
+                "script-src 'self' https://telegram.org",
+                "style-src 'self' 'unsafe-inline'",
+                "img-src 'self' data: blob:",
+                "connect-src 'self'",
+                "frame-ancestors https://web.telegram.org https://t.me"
+            ].join("; ")
+        );
+        next();
+    });
     app.get('/hello', (_, res) => res.send('Hello!'))
     // Static HTML (single big page)
     app.use("/public", express.static(path.join(__dirname, "..", "public"), {
@@ -22,6 +35,7 @@ export function startServer() {
 
     // WebApp entry page
     app.get("/app", (req, res) => {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.sendFile(path.join(__dirname, "..", "public", "app.html"));
     });
 
