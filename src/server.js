@@ -76,33 +76,62 @@ export function startServer() {
     });
 
     // WebApp: download (proxy stream). Token never leaks to frontend.
+    const TG_FILE_MAX = 50 * 1024 * 1024; // 50MB Bot API download limit
+
     app.get("/api/files/:id/download", webAppAuthMiddleware, async (req, res) => {
         const owner = req.webAppUser.id;
         const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();
         if (!file) return res.status(404).json({ error: "Not found" });
 
-        const token = process.env.BOT_TOKEN;
-        const tgFile = await tgGetFile(token, file.tgFileId);
-        const url = tgFileUrl(token, tgFile.file_path);
-
-        const r = await fetch(url);
-        if (!r.ok || !r.body) return res.status(502).json({ error: "Telegram fetch failed" });
-
-        res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
-        const name = file.fileName || "file";
-        res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(name)}"`);
-
-        // Node stream bridge
-        const reader = r.body.getReader();
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            res.write(Buffer.from(value));
+        // If you already stored fileSize, handle early
+        if ((file.fileSize || 0) > TG_FILE_MAX) {
+            return res.status(413).json({
+                error: "FILE_TOO_BIG_FOR_DOWNLOAD",
+                detail: "Telegram Bot API cannot download files larger than 50MB. Use /send instead."
+            });
         }
-        res.end();
+
+        try {
+            const token = process.env.BOT_TOKEN;
+
+            const tgFile = await tgGetFile(token, file.tgFileId); // can throw: file is too big
+            const url = tgFileUrl(token, tgFile.file_path);
+
+            const r = await fetch(url);
+            if (!r.ok || !r.body) return res.status(502).json({ error: "Telegram fetch failed" });
+
+            res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
+            const name = file.fileName || "file";
+            res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+
+            const reader = r.body.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                res.write(Buffer.from(value));
+            }
+            res.end();
+        } catch (e) {
+            const msg = String(e?.message || e);
+            if (msg.includes("file is too big")) {
+                return res.status(413).json({
+                    error: "FILE_TOO_BIG_FOR_DOWNLOAD",
+                    detail: "Telegram Bot API cannot download files larger than 50MB. Use /send instead."
+                });
+            }
+            return res.status(500).json({ error: "Server error" });
+        }
     });
 
     // SEND to Telegram (by file id). Telegram API is called from backend, so token is safe.
+    function pickTelegramSend(kind) {
+        if (kind === "photo") return { method: "sendPhoto", field: "photo" };
+        if (kind === "video") return { method: "sendVideo", field: "video" };
+        if (kind === "audio") return { method: "sendAudio", field: "audio" };
+        if (kind === "voice") return { method: "sendVoice", field: "voice" };
+        return { method: "sendDocument", field: "document" };
+    }
+
     app.post("/api/files/:id/send", webAppAuthMiddleware, async (req, res) => {
         try {
             const owner = req.webAppUser.id;
@@ -112,17 +141,17 @@ export function startServer() {
             const token = process.env.BOT_TOKEN;
             const chatId = owner;
 
+            const { method, field } = pickTelegramSend(file.kind);
             const caption = file.note ? String(file.note).slice(0, 1024) : undefined;
 
-            const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+            const payload = { chat_id: chatId };
+            payload[field] = file.tgFileId; // file_id
+            if (caption) payload.caption = caption;
+
+            const tgRes = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    chat_id: chatId,
-                    document: file.tgFileId, // <-- file_id
-                    caption,
-                    disable_content_type_detection: false
-                })
+                body: JSON.stringify(payload),
             }).then(r => r.json());
 
             if (!tgRes.ok) {
