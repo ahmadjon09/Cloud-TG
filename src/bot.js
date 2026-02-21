@@ -1,6 +1,7 @@
 import { Telegraf, Markup, Scenes, session } from "telegraf";
 import { UserModel } from "./models/User.js";
 import { FileModel } from "./models/File.js";
+import { version } from "../i.js";
 
 // Admin IDs ni tekshirish
 function isAdmin(userId) {
@@ -72,7 +73,6 @@ function adminMenu() {
     return Markup.inlineKeyboard([
         [Markup.button.callback("📊 Stats", "ADMIN_STATS")],
         [Markup.button.callback("📢 Broadcast", "ADMIN_BROADCAST")],
-        [Markup.button.callback("👥 Users List", "ADMIN_USERS")],
         [Markup.button.callback("🔙 Back to Main", "MAIN_MENU")]
     ]);
 }
@@ -230,7 +230,7 @@ Choose an option below to continue:
             const aboutText = `
 <b>ℹ️ About Cloud Bot</b>
 
-<b>Version:</b> 1.0.0
+<b>Version:</b> ${version}
 <b>Developer:</b> @wxkow
 <b>Platform:</b> Telegram Web App
 
@@ -686,6 +686,7 @@ You can now:
     bot.on("callback_query", async (ctx) => {
         await ctx.answerCbQuery();
     });
+
 
     // Error handler for polling errors
     bot.launch().catch((err) => {

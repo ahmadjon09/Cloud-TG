@@ -98,6 +98,39 @@ export function startServer() {
         res.end();
     });
 
+    // SEND to Telegram (by file id). Telegram API is called from backend, so token is safe.
+    app.post("/api/files/:id/send", webAppAuthMiddleware, async (req, res) => {
+        try {
+            const owner = req.webAppUser.id;
+            const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();
+            if (!file) return res.status(404).json({ error: "Not found" });
+
+            const token = process.env.BOT_TOKEN;
+            const chatId = owner;
+
+            const caption = file.note ? String(file.note).slice(0, 1024) : undefined;
+
+            const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    chat_id: chatId,
+                    document: file.tgFileId, // <-- file_id
+                    caption,
+                    disable_content_type_detection: false
+                })
+            }).then(r => r.json());
+
+            if (!tgRes.ok) {
+                return res.status(502).json({ error: "Telegram send failed", detail: tgRes.description });
+            }
+
+            res.json({ ok: true, messageId: tgRes.result?.message_id });
+        } catch (e) {
+            res.status(500).json({ error: "Server error" });
+        }
+    });
+    
     const port = Number(process.env.PORT || 5000);
     app.listen(port, () => console.log("HTTP on", port));
 }

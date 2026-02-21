@@ -1,99 +1,166 @@
+// app.js
 (function () {
     const tg = window.Telegram?.WebApp;
     let initData = "";
     let user = null;
 
-    // Agar Telegramda bo'lsa
+    // Telegram initialization
     if (tg) {
         tg.ready();
         tg.expand();
+        tg.enableClosingConfirmation();
         initData = tg.initData || "";
         user = tg.initDataUnsafe?.user;
 
+        // Theme handling
         if (tg.colorScheme) {
             document.body.setAttribute('data-tg-theme', tg.colorScheme);
         }
+
+        // Main button
+        tg.MainButton.setText('Upload File');
+        tg.MainButton.onClick(() => {
+            showToast('Upload feature coming soon!');
+        });
     } else {
-        // TEST UCHUN: Telegram bo'lmasa ham ishlayveradi
-        console.log("Not in Telegram - running in test mode");
+        // Test mode
+        console.log("Running in test mode");
         initData = "test_init_data";
-        user = { id: "123456789", username: "test_user" };
+        user = {
+            id: "123456789",
+            username: "test_user",
+            first_name: "Test",
+            last_name: "User"
+        };
     }
 
     // DOM Elements
-    const whoEl = document.getElementById("who");
-    const statusEl = document.getElementById("status");
-    const listEl = document.getElementById("list");
-    const modal = document.getElementById("modal");
-    const closeBtn = document.getElementById("close");
-    const saveBtn = document.getElementById("save");
-    const dlBtn = document.getElementById("download");
-    const mName = document.getElementById("m_name");
-    const mNote = document.getElementById("m_note");
-    const mMeta = document.getElementById("m_meta");
-    const refreshBtn = document.getElementById("refresh");
-    const totalFilesEl = document.getElementById("totalFiles");
-    const totalSizeEl = document.getElementById("totalSize");
-    const fileCountEl = document.getElementById("fileCount");
-    const toastEl = document.getElementById("toast");
-    const downloadProgress = document.getElementById("downloadProgress");
-    const progressFilename = document.getElementById("progressFilename");
-    const progressStats = document.getElementById("progressStats");
-    const progressPercent = document.getElementById("progressPercent");
-    const progressCircle = document.getElementById("progressCircle");
+    const elements = {
+        userName: document.getElementById('userName'),
+        userStatus: document.getElementById('userStatus'),
+        userAvatar: document.getElementById('avatarInitials'),
+        totalFiles: document.getElementById('totalFiles'),
+        totalSize: document.getElementById('totalSize'),
+        totalItems: document.getElementById('totalItems'),
+        filesList: document.getElementById('filesList'),
+        refreshBtn: document.getElementById('refreshBtn'),
+        modal: document.getElementById('fileModal'),
+        closeModal: document.getElementById('closeModal'),
+        fileName: document.getElementById('fileName'),
+        fileNote: document.getElementById('fileNote'),
+        fileMetadata: document.getElementById('fileMetadata'),
+        previewIcon: document.getElementById('previewIcon'),
+        sendToBotBtn: document.getElementById('sendToBotBtn'),
+        downloadBtn: document.getElementById('downloadBtn'),
+        downloadProgress: document.getElementById('downloadProgress'),
+        progressCircle: document.getElementById('progressCircle'),
+        progressPercent: document.getElementById('progressPercent'),
+        progressFilename: document.getElementById('progressFilename'),
+        progressStats: document.getElementById('progressStats'),
+        cancelDownload: document.getElementById('cancelDownload'),
+        toast: document.getElementById('toast'),
+        contextMenu: document.getElementById('contextMenu'),
+        sortBtn: document.getElementById('sortBtn'),
+        categories: document.querySelectorAll('.category-chip')
+    };
 
-    let currentId = null;
-    let toastTimeout = null;
-    let filesData = [];
+    // State
+    let state = {
+        files: [],
+        currentFile: null,
+        currentCategory: 'all',
+        sortOrder: 'desc',
+        downloadController: null,
+        toastTimeout: null,
+        longPressTimeout: null
+    };
 
-    // Set user info TEZ KORINISHI UCHUN
+    // Initialize Lucide icons
+    lucide.createIcons();
+
+    // Set user info
     if (user) {
-        const username = user.username ? `@${user.username}` : 'No username';
-        whoEl.textContent = `${username}`;
-        statusEl.textContent = 'Connected';
+        const firstName = user.first_name || '';
+        const lastName = user.last_name || '';
+        const username = user.username ? `@${user.username}` : '';
+
+        elements.userName.textContent = `${firstName} ${lastName}`.trim() || username || 'User';
+        elements.avatarInitials.textContent = getInitials(firstName, lastName);
     } else {
-        whoEl.textContent = "Demo User";
-        statusEl.textContent = 'Demo mode';
+        elements.userName.textContent = "Demo User";
+        elements.avatarInitials.textContent = "👤";
     }
 
-    // Toast function
-    function showToast(message, duration = 2000) {
-        if (toastTimeout) clearTimeout(toastTimeout);
-        toastEl.textContent = message;
-        toastEl.classList.add('show');
-        toastTimeout = setTimeout(() => {
-            toastEl.classList.remove('show');
-            toastTimeout = null;
+    // Helper functions
+    function getInitials(first, last) {
+        if (!first && !last) return "👤";
+        return (first?.charAt(0) || '' + last?.charAt(0) || '').toUpperCase() || "👤";
+    }
+
+    function formatFileSize(bytes) {
+        if (!bytes || bytes === 0) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let size = bytes;
+        let unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+            size /= 1024;
+            unitIndex++;
+        }
+        return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+    }
+
+    function getFileType(fileName, kind) {
+        const ext = fileName?.split('.').pop()?.toLowerCase() || '';
+        const type = kind?.toLowerCase() || '';
+
+        if (type.includes('image') || ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
+            return { category: 'images', icon: '🖼️', color: '#38bdf8' };
+        }
+        if (type.includes('video') || ['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) {
+            return { category: 'videos', icon: '🎥', color: '#f97316' };
+        }
+        if (type.includes('audio') || ['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext)) {
+            return { category: 'audio', icon: '🎵', color: '#8b5cf6' };
+        }
+        if (['pdf'].includes(ext)) {
+            return { category: 'documents', icon: '📕', color: '#ef4444' };
+        }
+        if (['doc', 'docx'].includes(ext)) {
+            return { category: 'documents', icon: '📘', color: '#3b82f6' };
+        }
+        if (['xls', 'xlsx', 'csv'].includes(ext)) {
+            return { category: 'documents', icon: '📗', color: '#22c55e' };
+        }
+        if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) {
+            return { category: 'archives', icon: '🗜️', color: '#a855f7' };
+        }
+        return { category: 'documents', icon: '📄', color: '#6b7280' };
+    }
+
+    function showToast(message, type = 'info', duration = 2000) {
+        if (state.toastTimeout) clearTimeout(state.toastTimeout);
+
+        elements.toast.textContent = message;
+        elements.toast.className = 'toast';
+        if (type === 'success') elements.toast.classList.add('success');
+        if (type === 'error') elements.toast.classList.add('error');
+        elements.toast.classList.add('show');
+
+        state.toastTimeout = setTimeout(() => {
+            elements.toast.classList.remove('show');
+            state.toastTimeout = null;
         }, duration);
     }
 
-    function setStatus(text, loading = false) {
+    function setLoading(loading) {
         if (loading) {
-            statusEl.innerHTML = `<span class="spinner"></span> ${text}`;
+            elements.refreshBtn.innerHTML = '<div class="spinner"></div>';
+            elements.refreshBtn.disabled = true;
         } else {
-            statusEl.textContent = text;
+            elements.refreshBtn.innerHTML = '<i data-lucide="refresh-cw" width="20" height="20"></i>';
+            elements.refreshBtn.disabled = false;
+            lucide.createIcons();
         }
-    }
-
-    // Progress functions
-    function showDownloadProgress(filename) {
-        progressFilename.textContent = filename.substring(0, 30);
-        progressPercent.textContent = '0%';
-        progressStats.textContent = '0 B / 0 B';
-        progressCircle.style.background = 'conic-gradient(var(--primary) 0deg, var(--border) 0deg)';
-        downloadProgress.classList.add('show');
-    }
-
-    function updateProgress(current, total) {
-        const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-        const degrees = (percent / 100) * 360;
-        progressPercent.textContent = `${percent}%`;
-        progressCircle.style.background = `conic-gradient(var(--primary) ${degrees}deg, var(--border) ${degrees}deg)`;
-        progressStats.textContent = `${formatFileSize(current)} / ${formatFileSize(total)}`;
-    }
-
-    function hideDownloadProgress() {
-        downloadProgress.classList.remove('show');
     }
 
     // API call
@@ -105,87 +172,34 @@
         };
 
         try {
-            const r = await fetch(path, { ...opts, headers });
-            if (!r.ok) {
-                const errorText = await r.text();
-                throw new Error(errorText || `HTTP error ${r.status}`);
+            const response = await fetch(path, { ...opts, headers });
+            if (!response.ok) {
+                const error = await response.text();
+                throw new Error(error || `HTTP error ${response.status}`);
             }
-            return await r.json();
+            return await response.json();
         } catch (error) {
             console.error('API error:', error);
             throw error;
         }
     }
 
-    function formatFileSize(bytes) {
-        if (!bytes || bytes === 0) return '0 B';
-        const units = ['B', 'KB', 'MB', 'GB'];
-        let size = bytes;
-        let unitIndex = 0;
-        while (size >= 1024 && unitIndex < units.length - 1) {
-            size /= 1024;
-            unitIndex++;
+    // Download functions
+    async function downloadFile(file, viaBot = false) {
+        if (viaBot) {
+            return sendViaBot(file);
         }
-        return `${size.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
-    }
 
-    function getFileIcon(kind = '') {
-        const k = String(kind).toLowerCase();
-        if (k.includes('image') || k.includes('jpg') || k.includes('png') || k.includes('photo')) return '🖼️';
-        if (k.includes('video') || k.includes('mp4')) return '🎥';
-        if (k.includes('audio') || k.includes('mp3')) return '🎵';
-        if (k.includes('pdf')) return '📕';
-        if (k.includes('word') || k.includes('doc')) return '📘';
-        if (k.includes('excel') || k.includes('xls')) return '📗';
-        if (k.includes('zip') || k.includes('rar')) return '🗜️';
-        return '📄';
-    }
-
-    function updateStats(files) {
-        const totalFiles = files.length;
-        const totalSize = files.reduce((acc, file) => acc + (file.fileSize || 0), 0);
-        totalFilesEl.textContent = totalFiles;
-        totalSizeEl.textContent = formatFileSize(totalSize);
-        fileCountEl.textContent = `${totalFiles} ${totalFiles === 1 ? 'item' : 'items'}`;
-    }
-
-    function openModal(item) {
-        currentId = item.id;
-        mName.value = item.fileName || '';
-        mNote.value = item.note || '';
-
-        const date = new Date(item.createdAt).toLocaleString(undefined, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        mMeta.innerHTML = `
-                    <div><span style="opacity:0.7;">Type:</span> ${item.kind || 'Unknown'}</div>
-                    <div><span style="opacity:0.7;">Size:</span> ${formatFileSize(item.fileSize)}</div>
-                    <div><span style="opacity:0.7;">Created:</span> ${date}</div>
-                `;
-
-        modal.style.display = "flex";
-    }
-
-    function closeModal() {
-        modal.style.display = "none";
-        currentId = null;
-    }
-
-    closeBtn.onclick = closeModal;
-    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
-
-    // Download function
-    async function downloadFile(id, fileName) {
         try {
-            const url = `/api/files/${id}/download?initData=${encodeURIComponent(initData)}`;
-            showDownloadProgress(fileName);
+            state.downloadController = new AbortController();
+            const url = `/api/files/${file.id}/download?initData=${encodeURIComponent(initData)}`;
 
-            const response = await fetch(url);
+            showDownloadProgress(file.fileName);
+
+            const response = await fetch(url, {
+                signal: state.downloadController.signal
+            });
+
             if (!response.ok) throw new Error(`Download failed: ${response.status}`);
 
             const contentLength = response.headers.get('content-length');
@@ -198,160 +212,463 @@
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
+
                 chunks.push(value);
                 received += value.length;
-                if (total > 0) updateProgress(received, total);
+                updateProgress(received, total, file.fileName);
             }
 
             const blob = new Blob(chunks);
             const url_blob = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url_blob;
-            a.download = fileName || 'download';
+            a.download = file.fileName || 'download';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url_blob);
 
             hideDownloadProgress();
-            showToast('✅ Download completed');
-            return true;
+            showToast('✅ Download completed', 'success');
         } catch (error) {
-            console.error('Download error:', error);
+            if (error.name === 'AbortError') {
+                showToast('⏹️ Download cancelled', 'info');
+            } else {
+                console.error('Download error:', error);
+                showToast('❌ Download failed', 'error');
+            }
             hideDownloadProgress();
-            showToast('❌ Download failed');
-            return false;
+        } finally {
+            state.downloadController = null;
         }
     }
+
+    async function sendViaBot(file) {
+        try {
+            showToast('📤 Sending via bot...', 'info');
+
+            const result = await api(`/api/files/${file.id}/send`, {
+                method: 'POST'
+            });
+
+            if (result.ok) {
+                showToast('✅ File sent to chat', 'success');
+            } else {
+                throw new Error(result.error || 'Failed to send');
+            }
+        } catch (error) {
+            console.error('Send error:', error);
+            showToast('❌ Failed to send', 'error');
+        }
+    }
+
+    function showDownloadProgress(filename) {
+        elements.progressFilename.textContent = filename.substring(0, 30);
+        elements.progressPercent.textContent = '0%';
+        elements.progressStats.textContent = '0 B / 0 B';
+        elements.progressCircle.style.background = 'conic-gradient(var(--primary) 0deg, var(--border) 0deg)';
+        elements.downloadProgress.classList.add('show');
+    }
+
+    function updateProgress(current, total, filename) {
+        const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+        const degrees = (percent / 100) * 360;
+
+        elements.progressPercent.textContent = `${percent}%`;
+        elements.progressCircle.style.background = `conic-gradient(var(--primary) ${degrees}deg, var(--border) ${degrees}deg)`;
+        elements.progressStats.textContent = `${formatFileSize(current)} / ${formatFileSize(total)}`;
+        elements.progressFilename.textContent = filename.substring(0, 30);
+    }
+
+    function hideDownloadProgress() {
+        elements.downloadProgress.classList.remove('show');
+        if (state.downloadController) {
+            state.downloadController.abort();
+            state.downloadController = null;
+        }
+    }
+
+    // Cancel download
+    elements.cancelDownload.addEventListener('click', hideDownloadProgress);
 
     // Load files
-    async function load() {
-        setStatus("Loading...", true);
-        refreshBtn.disabled = true;
+    async function loadFiles() {
+        setLoading(true);
 
-        // TEST UCHUN: Agar API bo'lmasa, demo data ko'rsatamiz
         try {
-            // Real API dan olishga urinamiz
-            let items = [];
+            let files = [];
             try {
-                items = await api("/api/files");
+                files = await api("/api/files");
             } catch (e) {
-                console.log("API not available, using demo data");
-                // Demo data
-                items = [
-                    { id: "1", fileName: "photo.jpg", kind: "photo", fileSize: 1024 * 1024 * 2.5, createdAt: new Date(), note: "Vacation photo" },
-                    { id: "2", fileName: "document.pdf", kind: "document", fileSize: 1024 * 1024 * 1.2, createdAt: new Date(Date.now() - 86400000), note: "Important document" },
-                    { id: "3", fileName: "video.mp4", kind: "video", fileSize: 1024 * 1024 * 15, createdAt: new Date(Date.now() - 172800000), note: "Meeting recording" },
-                    { id: "4", fileName: "audio.mp3", kind: "audio", fileSize: 1024 * 512, createdAt: new Date(Date.now() - 259200000), note: "Podcast episode" }
-                ];
+                console.log("Using demo data");
+                files = generateDemoFiles();
             }
 
-            filesData = items;
-            updateStats(items);
-
-            if (!items.length) {
-                listEl.innerHTML = `
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📁</div>
-                                <div class="empty-state-title">No files yet</div>
-                                <div class="empty-state-text">Send files to the bot</div>
-                            </div>
-                        `;
-            } else {
-                listEl.innerHTML = items.map(it => {
-                    const fileIcon = getFileIcon(it.kind);
-                    const safeName = String(it.fileName || 'Unnamed file').replace(/[<>]/g, '');
-                    return `
-                                <div class="file-card">
-                                    <div class="file-header">
-                                        <div class="file-info">
-                                            <div class="file-icon">${fileIcon}</div>
-                                            <span class="file-name">${safeName}</span>
-                                        </div>
-                                        <div class="file-actions">
-                                            <button class="icon-btn" onclick="window.downloadFileHandler('${it.id}', '${safeName}')">⬇️</button>
-                                            <button class="icon-btn primary" onclick="window.editFileHandler('${it.id}')">✎</button>
-                                        </div>
-                                    </div>
-                                    <div class="file-meta">
-                                        <span>📄 ${it.kind || 'File'}</span>
-                                        <span>💾 ${formatFileSize(it.fileSize)}</span>
-                                        <span>🕒 ${new Date(it.createdAt).toLocaleDateString()}</span>
-                                    </div>
-                                    ${it.note ? `<div class="file-note">📝 ${it.note}</div>` : ''}
-                                </div>
-                            `;
-                }).join('');
-            }
-
-            setStatus(`Updated ${new Date().toLocaleTimeString()}`);
-            showToast('Files loaded');
-        } catch (e) {
-            console.error(e);
-            setStatus("Error");
-            listEl.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">⚠️</div>
-                            <div class="empty-state-title">Error</div>
-                            <div class="empty-state-text">${e.message}</div>
-                            <button class="btn btn-primary" style="margin-top:16px;" onclick="load()">Try again</button>
-                        </div>
-                    `;
+            state.files = files;
+            updateStats();
+            filterAndRenderFiles();
+            showToast('Files loaded', 'success');
+        } catch (error) {
+            console.error('Load error:', error);
+            showToast('Failed to load files', 'error');
+            renderEmpty('error');
         } finally {
-            refreshBtn.disabled = false;
+            setLoading(false);
         }
     }
 
-    // Global handlers
-    window.downloadFileHandler = (id, name) => {
-        const file = filesData.find(f => f.id === id);
-        if (file) downloadFile(id, file.fileName || 'file');
-    };
+    function generateDemoFiles() {
+        const types = [
+            { name: 'Vacation Photo.jpg', kind: 'photo', size: 2.5 * 1024 * 1024, note: 'Beautiful sunset at the beach 🌅' },
+            { name: 'Project Document.pdf', kind: 'document', size: 1.2 * 1024 * 1024, note: 'Important project proposal' },
+            { name: 'Team Meeting.mp4', kind: 'video', size: 15 * 1024 * 1024, note: 'Weekly sync recording' },
+            { name: 'Podcast Episode.mp3', kind: 'audio', size: 512 * 1024, note: 'Tech talk episode #42' },
+            { name: 'Presentation.pptx', kind: 'presentation', size: 3.8 * 1024 * 1024, note: 'Q3 review slides' },
+            { name: 'Data Export.xlsx', kind: 'spreadsheet', size: 980 * 1024, note: 'Sales data 2024' },
+            { name: 'Project Archive.zip', kind: 'archive', size: 45 * 1024 * 1024, note: 'All source files' },
+            { name: 'Profile Picture.png', kind: 'image', size: 350 * 1024, note: 'New avatar' }
+        ];
 
-    window.editFileHandler = (id) => {
-        const file = filesData.find(f => f.id === id);
-        if (file) openModal(file);
-    };
+        return types.map((type, index) => ({
+            id: String(index + 1),
+            fileName: type.name,
+            kind: type.kind,
+            fileSize: type.size,
+            note: type.note,
+            createdAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
+        }));
+    }
 
-    // Event listeners
-    refreshBtn.onclick = load;
+    function updateStats() {
+        const totalFiles = state.files.length;
+        const totalSize = state.files.reduce((acc, file) => acc + (file.fileSize || 0), 0);
 
-    saveBtn.onclick = async () => {
-        if (!currentId) return;
-        saveBtn.innerHTML = '<span class="spinner"></span> Saving...';
-        saveBtn.disabled = true;
-        try {
-            await api(`/api/files/${currentId}`, {
-                method: "PATCH",
-                body: JSON.stringify({
-                    fileName: mName.value.trim() || null,
-                    note: mNote.value.trim() || null
-                })
+        elements.totalFiles.textContent = totalFiles;
+        elements.totalSize.textContent = formatFileSize(totalSize);
+        elements.totalItems.textContent = `${totalFiles} ${totalFiles === 1 ? 'item' : 'items'}`;
+    }
+
+    function filterAndRenderFiles() {
+        let filtered = state.files;
+
+        // Filter by category
+        if (state.currentCategory !== 'all') {
+            filtered = state.files.filter(file => {
+                const type = getFileType(file.fileName, file.kind);
+                return type.category === state.currentCategory;
             });
-            closeModal();
-            await load();
-            showToast('✅ Saved');
-        } catch {
-            showToast('❌ Error');
-        } finally {
-            saveBtn.innerHTML = '💾 Save';
-            saveBtn.disabled = false;
         }
-    };
 
-    dlBtn.onclick = () => {
-        if (!currentId) return;
-        const file = filesData.find(f => f.id === currentId);
-        if (file) {
-            downloadFile(currentId, file.fileName || 'file');
-            closeModal();
+        // Sort
+        filtered.sort((a, b) => {
+            const dateA = new Date(a.createdAt).getTime();
+            const dateB = new Date(b.createdAt).getTime();
+            return state.sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+        });
+
+        renderFiles(filtered);
+    }
+
+    function renderFiles(files) {
+        if (!files.length) {
+            renderEmpty('empty');
+            return;
         }
-    };
 
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal.style.display === 'flex') closeModal();
+        const html = files.map(file => {
+            const type = getFileType(file.fileName, file.kind);
+            const date = new Date(file.createdAt).toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+            });
+
+            return `
+                <div class="file-item" data-id="${file.id}" data-file='${JSON.stringify(file).replace(/'/g, "&apos;")}'>
+                    <div class="file-header">
+                        <div class="file-icon" style="background: ${type.color}20; color: ${type.color}">
+                            ${type.icon}
+                        </div>
+                        <div class="file-info">
+                            <span class="file-name">${escapeHtml(file.fileName || 'Unnamed')}</span>
+                            <div class="file-meta">
+                                <span>${formatFileSize(file.fileSize)}</span>
+                                <span>•</span>
+                                <span>${date}</span>
+                            </div>
+                        </div>
+                    </div>
+                    ${file.note ? `
+                        <div class="file-note">
+                            <i data-lucide="sticky-note" width="14" height="14"></i>
+                            ${escapeHtml(file.note)}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+
+        elements.filesList.innerHTML = html;
+        lucide.createIcons();
+        attachFileListeners();
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function renderEmpty(type) {
+        if (type === 'error') {
+            elements.filesList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">⚠️</div>
+                    <div class="empty-state-title">Failed to load</div>
+                    <div class="empty-state-text">Tap to try again</div>
+                </div>
+            `;
+        } else {
+            elements.filesList.innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-state-icon">📁</div>
+                    <div class="empty-state-title">No files yet</div>
+                    <div class="empty-state-text">Send files to the bot</div>
+                </div>
+            `;
+        }
+    }
+
+    function attachFileListeners() {
+        document.querySelectorAll('.file-item').forEach(item => {
+            // Click to open modal
+            item.addEventListener('click', (e) => {
+                if (e.target.closest('.context-menu')) return;
+                const fileData = item.dataset.file;
+                if (fileData) {
+                    try {
+                        const file = JSON.parse(fileData.replace(/&apos;/g, "'"));
+                        openFileModal(file);
+                    } catch (error) {
+                        console.error('Parse error:', error);
+                    }
+                }
+            });
+
+            // Long press for context menu
+            item.addEventListener('touchstart', (e) => {
+                state.longPressTimeout = setTimeout(() => {
+                    const rect = item.getBoundingClientRect();
+                    const touch = e.touches[0];
+
+                    const fileData = item.dataset.file;
+                    if (fileData) {
+                        try {
+                            const file = JSON.parse(fileData.replace(/&apos;/g, "'"));
+                            showContextMenu(file, touch.clientX, touch.clientY);
+                        } catch (error) {
+                            console.error('Parse error:', error);
+                        }
+                    }
+                }, 500);
+            });
+
+            item.addEventListener('touchend', () => {
+                clearTimeout(state.longPressTimeout);
+            });
+
+            item.addEventListener('touchmove', () => {
+                clearTimeout(state.longPressTimeout);
+            });
+        });
+    }
+
+    // Context menu
+    function showContextMenu(file, x, y) {
+        state.currentFile = file;
+
+        elements.contextMenu.style.display = 'block';
+        elements.contextMenu.style.left = `${x}px`;
+        elements.contextMenu.style.top = `${y}px`;
+        elements.contextMenu.classList.add('show');
+
+        // Hide on click outside
+        setTimeout(() => {
+            document.addEventListener('click', hideContextMenu, { once: true });
+        }, 100);
+    }
+
+    function hideContextMenu() {
+        elements.contextMenu.classList.remove('show');
+        setTimeout(() => {
+            elements.contextMenu.style.display = 'none';
+        }, 200);
+    }
+
+    // Context menu actions
+    elements.contextMenu.addEventListener('click', async (e) => {
+        const action = e.target.closest('.context-item')?.dataset.action;
+        if (!action || !state.currentFile) return;
+
+        hideContextMenu();
+
+        switch (action) {
+            case 'send':
+                await sendViaBot(state.currentFile);
+                break;
+            case 'download':
+                await downloadFile(state.currentFile, false);
+                break;
+            case 'rename':
+                openFileModal(state.currentFile);
+                break;
+            case 'delete':
+                if (confirm('Delete this file?')) {
+                    showToast('Deleted', 'success');
+                }
+                break;
+        }
     });
 
+    // Modal functions
+    function openFileModal(file) {
+        state.currentFile = file;
+        const type = getFileType(file.fileName, file.kind);
 
-    setTimeout(load, 100);
+        elements.fileName.value = file.fileName || '';
+        elements.fileNote.value = file.note || '';
+        elements.previewIcon.textContent = type.icon;
+        elements.previewIcon.style.background = `${type.color}20`;
+        elements.previewIcon.style.color = type.color;
+
+        const date = new Date(file.createdAt).toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        elements.fileMetadata.innerHTML = `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: var(--text-secondary);">Type</span>
+                <span>${file.kind || 'Unknown'}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: var(--text-secondary);">Size</span>
+                <span>${formatFileSize(file.fileSize)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: var(--text-secondary);">Created</span>
+                <span>${date}</span>
+            </div>
+        `;
+
+        elements.modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+        elements.modal.classList.remove('show');
+        document.body.style.overflow = '';
+        state.currentFile = null;
+    }
+
+    // Modal buttons
+    elements.sendToBotBtn.addEventListener('click', async () => {
+        if (state.currentFile) {
+            await sendViaBot(state.currentFile);
+            closeModal();
+        }
+    });
+
+    elements.downloadBtn.addEventListener('click', async () => {
+        if (state.currentFile) {
+            await downloadFile(state.currentFile, false);
+            closeModal();
+        }
+    });
+
+    elements.closeModal.addEventListener('click', closeModal);
+    elements.modal.addEventListener('click', (e) => {
+        if (e.target === elements.modal) closeModal();
+    });
+
+    // Save file changes
+    async function saveFileChanges() {
+        if (!state.currentFile) return;
+
+        const updates = {};
+        if (elements.fileName.value !== state.currentFile.fileName) {
+            updates.fileName = elements.fileName.value.trim();
+        }
+        if (elements.fileNote.value !== state.currentFile.note) {
+            updates.note = elements.fileNote.value.trim();
+        }
+
+        if (Object.keys(updates).length === 0) {
+            closeModal();
+            return;
+        }
+
+        try {
+            setLoading(true);
+            await api(`/api/files/${state.currentFile.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(updates)
+            });
+
+            showToast('✅ Changes saved', 'success');
+            closeModal();
+            await loadFiles();
+        } catch (error) {
+            console.error('Save error:', error);
+            showToast('❌ Failed to save', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    // Category filter
+    elements.categories.forEach(chip => {
+        chip.addEventListener('click', () => {
+            elements.categories.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+
+            state.currentCategory = chip.dataset.category;
+            filterAndRenderFiles();
+        });
+    });
+
+    // Sort button
+    elements.sortBtn.addEventListener('click', () => {
+        state.sortOrder = state.sortOrder === 'desc' ? 'asc' : 'desc';
+        elements.sortBtn.innerHTML = `
+            <i data-lucide="arrow-down-up" width="16" height="16"></i>
+            <span>${state.sortOrder === 'desc' ? 'Latest' : 'Oldest'}</span>
+        `;
+        lucide.createIcons();
+        filterAndRenderFiles();
+    });
+
+    // Refresh button
+    elements.refreshBtn.addEventListener('click', loadFiles);
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (elements.modal.classList.contains('show')) {
+                closeModal();
+            }
+            if (elements.contextMenu.classList.contains('show')) {
+                hideContextMenu();
+            }
+        }
+    });
+
+    // Initialize
+    loadFiles();
+
+    // Auto refresh every 30 seconds
+    setInterval(loadFiles, 30000);
 })();

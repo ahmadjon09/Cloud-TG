@@ -1,71 +1,150 @@
-<!doctype html>
+<!-- app.html -->
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8">
     <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Cloud · Telegram Web App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/public/app.css" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/public/app.css">
 </head>
 
 <body>
-    <div class="app-container">
+    <div class="app">
         <!-- Header -->
-        <div class="header">
-            <div class="user-info">
-                <span class="user-name" id="who">Loading...</span>
-                <span class="user-status" id="status">Initializing...</span>
+        <header class="header">
+            <div class="user-section">
+                <div class="user-avatar" id="userAvatar">
+                    <span id="avatarInitials">👤</span>
+                </div>
+                <div class="user-details">
+                    <span class="user-name" id="userName">Loading...</span>
+                    <span class="user-status" id="userStatus">
+                        <span class="status-dot"></span>
+                        Connected
+                    </span>
+                </div>
             </div>
-            <button class="refresh-btn" id="refresh">↻</button>
+            <button class="icon-button" id="refreshBtn">
+                <i data-lucide="refresh-cw" width="20" height="20"></i>
+            </button>
+        </header>
+
+        <!-- Stats Cards -->
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i data-lucide="hard-drive" width="20" height="20"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Total files</span>
+                    <span class="stat-value" id="totalFiles">0</span>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">
+                    <i data-lucide="database" width="20" height="20"></i>
+                </div>
+                <div class="stat-content">
+                    <span class="stat-label">Storage</span>
+                    <span class="stat-value" id="totalSize">0 B</span>
+                </div>
+            </div>
         </div>
 
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">Total files</div>
-                <div class="stat-value" id="totalFiles">0</div>
-                <div class="stat-sub">in cloud</div>
+        <!-- Categories -->
+        <div class="categories-section">
+            <div class="section-header">
+                <h2 class="section-title">Categories</h2>
+                <span class="section-badge" id="totalItems">0 items</span>
             </div>
-            <div class="stat-card">
-                <div class="stat-label">Storage used</div>
-                <div class="stat-value" id="totalSize">0 B</div>
-                <div class="stat-sub">across all files</div>
+            <div class="categories-scroll" id="categories">
+                <button class="category-chip active" data-category="all">
+                    <i data-lucide="layout-grid" width="16" height="16"></i>
+                    All
+                </button>
+                <button class="category-chip" data-category="images">
+                    <i data-lucide="image" width="16" height="16"></i>
+                    Images
+                </button>
+                <button class="category-chip" data-category="documents">
+                    <i data-lucide="file-text" width="16" height="16"></i>
+                    Documents
+                </button>
+                <button class="category-chip" data-category="videos">
+                    <i data-lucide="video" width="16" height="16"></i>
+                    Videos
+                </button>
+                <button class="category-chip" data-category="audio">
+                    <i data-lucide="music" width="16" height="16"></i>
+                    Audio
+                </button>
+                <button class="category-chip" data-category="archives">
+                    <i data-lucide="archive" width="16" height="16"></i>
+                    Archives
+                </button>
             </div>
-        </div>
-
-        <!-- Files Header -->
-        <div class="section-header">
-            <h2 class="section-title">Your files</h2>
-            <span class="file-count" id="fileCount">0 items</span>
         </div>
 
         <!-- Files List -->
-        <div id="list" class="files-grid"></div>
+        <div class="files-section">
+            <div class="section-header">
+                <h2 class="section-title">Your files</h2>
+                <button class="sort-button" id="sortBtn">
+                    <i data-lucide="arrow-down-up" width="16" height="16"></i>
+                    <span>Date</span>
+                </button>
+            </div>
+            <div id="filesList" class="files-list"></div>
+        </div>
     </div>
 
-    <!-- Modal -->
-    <div class="modal" id="modal">
+    <!-- File Modal -->
+    <div class="modal" id="fileModal">
+        <div class="modal-overlay"></div>
         <div class="modal-content">
             <div class="modal-header">
-                <span class="modal-title">File details</span>
-                <button class="close-btn" id="close">✕</button>
+                <h3 class="modal-title">File details</h3>
+                <button class="modal-close" id="closeModal">
+                    <i data-lucide="x" width="20" height="20"></i>
+                </button>
             </div>
             <div class="modal-body">
-                <div class="input-group">
-                    <label class="input-label">File name</label>
-                    <input type="text" class="input-field" id="m_name" placeholder="Enter file name" />
+                <div class="file-preview" id="filePreview">
+                    <div class="preview-icon" id="previewIcon">📄</div>
                 </div>
+
                 <div class="input-group">
-                    <label class="input-label">Note</label>
-                    <textarea class="input-field" id="m_note" placeholder="Add notes..."></textarea>
+                    <label class="input-label">
+                        <i data-lucide="file" width="14" height="14"></i>
+                        File name
+                    </label>
+                    <input type="text" class="input-field" id="fileName" placeholder="Enter file name">
                 </div>
-                <div class="meta-info" id="m_meta"></div>
+
+                <div class="input-group">
+                    <label class="input-label">
+                        <i data-lucide="sticky-note" width="14" height="14"></i>
+                        Note
+                    </label>
+                    <textarea class="input-field textarea" id="fileNote" placeholder="Add a note..."
+                        rows="3"></textarea>
+                </div>
+
+                <div class="file-metadata" id="fileMetadata"></div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" id="download">⬇️ Download</button>
-                <button class="btn btn-primary" id="save">💾 Save</button>
+                <button class="modal-button secondary" id="sendToBotBtn">
+                    <i data-lucide="send" width="18" height="18"></i>
+                    Send via Bot
+                </button>
+                <button class="modal-button primary" id="downloadBtn">
+                    <i data-lucide="download" width="18" height="18"></i>
+                    Download
+                </button>
             </div>
         </div>
     </div>
@@ -73,16 +152,39 @@
     <!-- Download Progress -->
     <div class="download-progress" id="downloadProgress">
         <div class="progress-circle" id="progressCircle">
-            <span class="progress-text" id="progressPercent">0%</span>
+            <span class="progress-percent" id="progressPercent">0%</span>
         </div>
-        <div class="progress-info">
+        <div class="progress-details">
             <div class="progress-filename" id="progressFilename">Downloading...</div>
             <div class="progress-stats" id="progressStats">0 B / 0 B</div>
         </div>
+        <button class="progress-cancel" id="cancelDownload">
+            <i data-lucide="x" width="18" height="18"></i>
+        </button>
     </div>
 
     <!-- Toast -->
     <div class="toast" id="toast"></div>
+
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <button class="context-item" data-action="send">
+            <i data-lucide="send" width="16" height="16"></i>
+            Send via Bot
+        </button>
+        <button class="context-item" data-action="download">
+            <i data-lucide="download" width="16" height="16"></i>
+            Download
+        </button>
+        <button class="context-item" data-action="rename">
+            <i data-lucide="edit-2" width="16" height="16"></i>
+            Rename
+        </button>
+        <button class="context-item" data-action="delete">
+            <i data-lucide="trash-2" width="16" height="16"></i>
+            Delete
+        </button>
+    </div>
 
     <script src="/public/app.js" defer></script>
 </body>
