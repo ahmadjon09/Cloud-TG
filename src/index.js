@@ -3,6 +3,7 @@ import { connectDB } from "./db.js";
 import { startServer } from "./server.js";
 import { startBot } from "./bot.js";
 import axios from "axios";
+import { bot } from "./support.js";
 
 
 const keepServerAlive = () => {

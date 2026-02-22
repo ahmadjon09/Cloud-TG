@@ -59,7 +59,67 @@ export function startServer() {
             createdAt: x.createdAt
         })));
     });
+    app.get("/api/files/:id/preview", webAppAuthMiddleware, async (req, res) => {
+        const owner = req.webAppUser.id;
+        const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();
+        if (!file) return res.status(404).json({ error: "Not found" });
 
+        // Only preview media
+        if (!["photo", "video", "audio"].includes(file.kind)) {
+            return res.status(400).json({ error: "PREVIEW_NOT_SUPPORTED" });
+        }
+
+        if ((file.fileSize || 0) > TG_FILE_MAX) {
+            return res.status(413).json({ error: "FILE_TOO_BIG_FOR_PREVIEW" });
+        }
+
+        try {
+            const token = process.env.BOT_TOKEN;
+            const tgFile = await tgGetFile(token, file.tgFileId);
+            const url = tgFileUrl(token, tgFile.file_path);
+
+            const range = req.headers.range; // e.g. "bytes=0-"
+            const headers = {};
+            if (range) headers["Range"] = range;
+
+            const r = await fetch(url, { headers });
+
+            if (!r.ok || !r.body) {
+                return res.status(502).json({ error: "Telegram fetch failed" });
+            }
+
+            // Important for <video> seeking: forward status and range headers when present
+            res.status(r.status); // 200 or 206
+
+            const ct = file.mimeType || r.headers.get("content-type") || "application/octet-stream";
+            res.setHeader("Content-Type", ct);
+
+            // inline preview (NOT attachment)
+            res.setHeader("Content-Disposition", "inline");
+
+            const cr = r.headers.get("content-range");
+            const al = r.headers.get("accept-ranges");
+            const cl = r.headers.get("content-length");
+
+            if (cr) res.setHeader("Content-Range", cr);
+            if (al) res.setHeader("Accept-Ranges", al);
+            if (cl) res.setHeader("Content-Length", cl);
+
+            const reader = r.body.getReader();
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                res.write(Buffer.from(value));
+            }
+            res.end();
+        } catch (e) {
+            const msg = String(e?.message || e);
+            if (msg.includes("file is too big")) {
+                return res.status(413).json({ error: "FILE_TOO_BIG_FOR_PREVIEW" });
+            }
+            return res.status(500).json({ error: "Server error" });
+        }
+    });
     // WebApp: rename/edit metadata
     app.patch("/api/files/:id", webAppAuthMiddleware, async (req, res) => {
         const owner = req.webAppUser.id;
@@ -75,8 +135,8 @@ export function startServer() {
         res.json({ ok: true });
     });
 
-    // WebApp: download (proxy stream). Token never leaks to frontend.
-    const TG_FILE_MAX = 50 * 1024 * 1024; // 50MB Bot API download limit
+
+    const TG_FILE_MAX = 50 * 1024 * 1024;
 
     app.get("/api/files/:id/download", webAppAuthMiddleware, async (req, res) => {
         const owner = req.webAppUser.id;
