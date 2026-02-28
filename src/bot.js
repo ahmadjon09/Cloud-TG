@@ -105,7 +105,7 @@ async function safeEditMessage(ctx, text, keyboard, parseMode = "HTML") {
             disable_web_page_preview: true
         });
     } catch (err) {
-        // Silently ignore "not modified" - everything else re-throw
+        // Silently ignore "not modified"  everything else re-throw
         if (err?.code === 400 && err?.description?.includes("message is not modified")) return;
         // If original message was deleted, fall back to a new reply
         if (err?.code === 400 && err?.description?.includes("message to edit not found")) {
@@ -472,7 +472,7 @@ async function getUserStats(tgUserId) {
         const weekScore = weeklyFiles * 10 + weeklyReferrals * 50;
         const monthScore = monthlyFiles * 10 + monthlyReferrals * 50;
 
-        // Persist scores in background - don't block the response
+        // Persist scores in background  don't block the response
         UserModel.updateOne({ tgUserId }, { $set: { weekScore, monthScore } }).catch(() => { });
 
         const result = {
@@ -578,7 +578,7 @@ async function upsertUser(ctx, referralCode = null) {
             refAwardedAt: null
         });
 
-        // Process referral in background - don't delay the welcome message
+        // Process referral in background  don't delay the welcome message
         if (referralCode) {
             processReferral(tgUserId, referralCode).catch(() => { });
         }
@@ -620,7 +620,7 @@ export async function startBot() {
 
     bot.use(session());
 
-    // Global error handler - prevents unhandled rejections from crashing the process
+    // Global error handler  prevents unhandled rejections from crashing the process
     bot.catch((err, ctx) => {
         console.error(`[${ctx?.updateType}] Global error:`, err.message);
         ctx?.reply?.(formatError(err), { parse_mode: "HTML" }).catch(() => { });
@@ -656,15 +656,10 @@ export async function startBot() {
 I can help you store and manage your files securely in the cloud.
 
 <b>📱 Features:</b>
-• Send any file - it gets saved instantly
+• Send any file  it gets saved instantly
 • Manage files via the Web App
 • Edit file names and notes
 • Download your files anytime, anywhere
-
-<b>🎁 Referral Program:</b>
-• Invite friends → earn <b>50 points</b> per referral
-• Top users earn <b>diamond rewards</b> every week
-• Compete on weekly &amp; monthly leaderboards
 `.trim();
 
             if (startParam) {
@@ -742,8 +737,8 @@ I can help you store and manage your files securely in the cloud.
 • Monthly: #${rank.monthly} of ${rank.totalUsers}
 
 <b>🎁 Weekly Rewards:</b>
-• 🥇 1st - 1000 💎 | 🥈 2nd - 500 💎 | 🥉 3rd - 250 💎
-• Top 5 - 100 💎 | Top 10 - 50 💎
+• 🥇 1st  1000 💎 | 🥈 2nd  500 💎 | 🥉 3rd  250 💎
+• Top 5  100 💎 | Top 10  50 💎
 
 <b>📢 Share your link and start earning!</b>
       `.trim();
@@ -894,7 +889,7 @@ ${formatLeaderboard(leaderboard, "monthly")}
                 await safeEditMessage(ctx, `
 <b>🎁 Reward Claimed!</b>
 
-${rewardRow.badge} ${rewardRow.title} - <b>+${rewardRow.diamonds} 💎</b>
+${rewardRow.badge} ${rewardRow.title}  <b>+${rewardRow.diamonds} 💎</b>
 
 <b>New balance:</b> ${(user.diamonds || 0) + rewardRow.diamonds} 💎
 
@@ -944,17 +939,15 @@ Upload more files and invite friends to climb the leaderboard!
 <b>🆘 Help &amp; Support</b>
 
 <b>How do I save files?</b>
-Just send any file to the bot - it's saved automatically.
+Just send any file to the bot  it's saved automatically.
 
 <b>What are the size limits?</b>
-• Documents / Video: 1 GB
-• Photos: 20 MB
-• Audio: 300 MB
-• Voice: 70 MB
+• Documents / Video / Audio / Voice: 50 MB
+• Photos: 10 MB
 
 <b>How do I earn points?</b>
-• Upload a file → +10 pts
-• Invite a friend → +50 pts
+• Upload a file →  +10 pts
+• Invite a friend →  +50 pts
 
 <b>How do I invite friends?</b>
 Go to <b>Referrals</b> and share your personal link.
@@ -963,7 +956,7 @@ Go to <b>Referrals</b> and share your personal link.
 Weekly (every Monday) and monthly (1st of each month).
 
 <b>Are my files private?</b>
-Yes - stored on Telegram servers, accessible only by you.
+Yes  stored on Telegram servers, accessible only by you.
     `.trim(), mainMenu(true));
     });
 
@@ -1007,11 +1000,11 @@ ${kindText}
         await safeEditMessage(ctx, `
 <b>📈 File Size Limits</b>
 
-📄 <b>Documents</b> - max <code>1 GB</code>
-🖼 <b>Photos</b> - max <code>20 MB</code>
-🎥 <b>Videos</b> - max <code>1 GB</code>
-🎵 <b>Audio</b> - max <code>300 MB</code>
-🎤 <b>Voice</b> - max <code>70 MB</code>
+📄 <b>Documents</b>  max <code>50 MB</code>
+🖼 <b>Photos</b>  max <code>10 MB</code>
+🎥 <b>Videos</b>  max <code>50 MB</code>
+🎵 <b>Audio</b>  max <code>50 MB</code>
+🎤 <b>Voice</b>  max <code>50 MB</code>
 
 <b>⚠️ Tips:</b>
 • Split large files before uploading
@@ -1157,14 +1150,14 @@ Send /cancel to abort.
                             sent++;
                         } catch (err) {
                             if (err?.code === 403) {
-                                // User blocked the bot - mark and skip
+                                // User blocked the bot  mark and skip
                                 UserModel.updateOne({ tgUserId: u.tgUserId }, { $set: { isBlocked: true } }).catch(() => { });
                                 blocked++;
                             } else {
                                 failed++;
                             }
                         }
-                        await sleep(50); // ~20 msg/s - within Telegram rate limits
+                        await sleep(50); // ~20 msg/s  within Telegram rate limits
                     }
 
                     page++;
@@ -1199,11 +1192,11 @@ Send /cancel to abort.
     // ======================================================
 
     const FILE_LIMITS = {
-        document: 1024 * 1024 * 1024,
-        video: 1024 * 1024 * 1024,
-        audio: 300 * 1024 * 1024,
-        voice: 70 * 1024 * 1024,
-        photo: 20 * 1024 * 1024
+        document: 50 * 1024 * 1024,
+        video: 50 * 1024 * 1024,
+        audio: 50 * 1024 * 1024,
+        voice: 50 * 1024 * 1024,
+        photo: 10 * 1024 * 1024
     };
 
     const DEFAULT_NAMES = {
@@ -1263,6 +1256,7 @@ Send /cancel to abort.
 📁 <b>Type:</b> ${kind}
 💾 <b>Size:</b> ${formatFileSize(fileSize)}
 ⚡️ <b>Points earned:</b> +10 pts
+🆔 <b>ID:</b> <code>${file._id}</code>
 
 Open the Cloud to manage, rename, or download your files.
 Earn more points by inviting friends!
@@ -1270,7 +1264,7 @@ Earn more points by inviting friends!
         });
     });
 
-    // Catch-all for unhandled callback queries - prevents spinner from hanging
+    // Catch-all for unhandled callback queries  prevents spinner from hanging
     bot.on("callback_query", async (ctx) => {
         await ctx.answerCbQuery().catch(() => { });
     });
@@ -1280,11 +1274,11 @@ Earn more points by inviting friends!
     // ======================================================
 
     await bot.launch();
-    console.log("✅ Bot started - Referral & Leaderboard system active (Optimized, No Redis)");
+    console.log("✅ Bot started  Referral & Leaderboard system active (Optimized, No Redis)");
 
     // Graceful shutdown
     const shutdown = (signal) => () => {
-        console.log(`\n${signal} received - shutting down…`);
+        console.log(`\n${signal} received  shutting down…`);
         bot.stop(signal);
         memoryCache.clear();
         process.exit(0);

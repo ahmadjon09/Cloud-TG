@@ -640,29 +640,40 @@
 
     // ===== VIDEO PLAYER =====
     function buildVideoPlayer(file, url) {
+        el.previewBody.style.background = '#000';
         el.previewBody.innerHTML = `
-      <div class="video-player-wrap controls-visible" id="vpWrap">
-        <div class="video-main" id="vpMain">
-          <video id="vpVideo" playsinline webkit-playsinline preload="metadata">
+      <div id="vpWrap" style="width:100%;height:100%;display:flex;flex-direction:column;background:#000;position:relative;overflow:hidden;">
+        <div id="vpMain" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;overflow:hidden;">
+          <video id="vpVideo"
+            playsinline
+            webkit-playsinline
+            preload="auto"
+            style="width:100%;height:100%;object-fit:contain;display:block;background:#000;">
+            <source src="${url}" type="video/mp4">
             <source src="${url}">
-            Your browser does not support video.
           </video>
-          <div class="video-overlay" id="vpOverlay">
-            <div class="video-controls">
-              <div class="video-progress-wrap">
-                <div class="video-time-row">
-                  <span id="vpCurrent">0:00</span>
-                  <span id="vpTotal">0:00</span>
-                </div>
-                <input type="range" class="video-seekbar" id="vpSeekbar" min="0" max="100" step="0.1" value="0">
+          <div id="vpOverlay" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;opacity:1;transition:opacity 0.3s;background:linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%);">
+            <div style="padding:16px 16px 20px;">
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:8px;font-variant-numeric:tabular-nums;">
+                <span id="vpCurrent">0:00</span>
+                <span id="vpTotal">0:00</span>
               </div>
-              <div class="video-btn-row">
-                <button class="vid-btn play-btn" id="vpPlay"><i class="fas fa-play" id="vpPlayIcon"></i></button>
-                <button class="vid-btn" id="vpMute"><i class="fas fa-volume-high"></i></button>
-                <input type="range" class="vid-volume" id="vpVolume" min="0" max="1" step="0.01" value="1">
-                <span class="vid-spacer"></span>
-                <span class="vid-info" id="vpInfo">${file.fileName || ''}</span>
-                <button class="vid-btn" id="vpFullscreen" title="Fullscreen"><i class="fas fa-expand"></i></button>
+              <input type="range" id="vpSeekbar" min="0" max="1000" step="1" value="0"
+                style="width:100%;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.3);border-radius:99px;cursor:pointer;outline:none;margin-bottom:14px;">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <button id="vpPlay" style="background:none;border:none;color:#fff;font-size:26px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+                  <i class="fas fa-play" id="vpPlayIcon"></i>
+                </button>
+                <button id="vpMute" style="background:none;border:none;color:rgba(255,255,255,0.8);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+                  <i class="fas fa-volume-high" id="vpMuteIcon"></i>
+                </button>
+                <input type="range" id="vpVolume" min="0" max="1" step="0.02" value="1"
+                  style="width:70px;height:3px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.4);border-radius:99px;cursor:pointer;outline:none;flex-shrink:0;">
+                <span style="flex:1"></span>
+                <span id="vpResInfo" style="font-size:11px;color:rgba(255,255,255,0.5);"></span>
+                <button id="vpFullscreen" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+                  <i class="fas fa-expand" id="vpFsIcon"></i>
+                </button>
               </div>
             </div>
           </div>
@@ -673,85 +684,125 @@
     }
 
     function initVideoPlayer(file) {
-        const wrap = $('vpWrap'), vid = $('vpVideo');
+        const wrap = $('vpWrap'), vid = $('vpVideo'), overlay = $('vpOverlay');
+        const vpMain = $('vpMain');
         if (!vid) return;
         state.vp.video = vid;
 
         const vpPlay = $('vpPlay'), vpPlayIcon = $('vpPlayIcon');
-        const vpMute = $('vpMute'), vpVolume = $('vpVolume');
+        const vpMute = $('vpMute'), vpMuteIcon = $('vpMuteIcon');
+        const vpVolume = $('vpVolume');
         const vpCurrent = $('vpCurrent'), vpTotal = $('vpTotal'), vpSeekbar = $('vpSeekbar');
-        const vpFullscreen = $('vpFullscreen'), vpMain = $('vpMain');
+        const vpFullscreen = $('vpFullscreen'), vpFsIcon = $('vpFsIcon');
+        const vpResInfo = $('vpResInfo');
+
+        let controlsTimer = null;
 
         function showControls() {
-            wrap.classList.add('controls-visible');
-            clearTimeout(state.vp.hideTimeout);
-            state.vp.hideTimeout = setTimeout(() => { if (!vid.paused) wrap.classList.remove('controls-visible'); }, 3000);
+            overlay.style.opacity = '1';
+            clearTimeout(controlsTimer);
+            controlsTimer = setTimeout(() => { if (!vid.paused) overlay.style.opacity = '0'; }, 3500);
+        }
+
+        function hideControls() {
+            if (!vid.paused) overlay.style.opacity = '0';
         }
 
         function updatePlayUI() {
-            const playing = !vid.paused;
-            vpPlayIcon.className = playing ? 'fas fa-pause' : 'fas fa-play';
+            vpPlayIcon.className = vid.paused ? 'fas fa-play' : 'fas fa-pause';
         }
 
         vid.addEventListener('loadedmetadata', () => {
             vpTotal.textContent = formatTime(vid.duration);
-            vpSeekbar.max = vid.duration;
+            vpSeekbar.max = 1000;
+            if (vid.videoWidth && vid.videoHeight) {
+                vpResInfo.textContent = vid.videoWidth + 'x' + vid.videoHeight;
+            }
         });
 
         vid.addEventListener('timeupdate', () => {
             vpCurrent.textContent = formatTime(vid.currentTime);
-            vpSeekbar.value = vid.currentTime;
+            if (vid.duration) vpSeekbar.value = (vid.currentTime / vid.duration) * 1000;
         });
 
-        vid.addEventListener('ended', () => { updatePlayUI(); wrap.classList.add('controls-visible'); });
-        vid.addEventListener('error', () => showToast('Cannot play this video', 'error'));
+        vid.addEventListener('ended', () => { updatePlayUI(); overlay.style.opacity = '1'; clearTimeout(controlsTimer); });
+        vid.addEventListener('error', e => {
+            console.error('Video error:', e);
+            showToast('Cannot play this video', 'error');
+        });
         vid.addEventListener('play', updatePlayUI);
-        vid.addEventListener('pause', updatePlayUI);
+        vid.addEventListener('pause', () => { updatePlayUI(); overlay.style.opacity = '1'; clearTimeout(controlsTimer); });
+        vid.addEventListener('waiting', () => { /* buffering */ });
+        vid.addEventListener('canplay', () => { /* ready */ });
 
-        vpPlay.addEventListener('click', () => {
-            if (vid.paused) vid.play().catch(() => showToast('Playback failed', 'error'));
+        vpPlay.addEventListener('click', e => {
+            e.stopPropagation();
+            if (vid.paused) vid.play().catch(err => { console.error(err); showToast('Playback failed - try sending via bot', 'error'); });
             else vid.pause();
             showControls();
         });
 
-        vpMute.addEventListener('click', () => {
+        vpMute.addEventListener('click', e => {
+            e.stopPropagation();
             vid.muted = !vid.muted;
-            vpMute.innerHTML = `<i class="fas ${vid.muted ? 'fa-volume-xmark' : 'fa-volume-high'}"></i>`;
+            vpMuteIcon.className = vid.muted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
         });
 
-        vpVolume.addEventListener('input', () => { vid.volume = parseFloat(vpVolume.value); });
+        vpVolume.addEventListener('input', e => {
+            e.stopPropagation();
+            vid.volume = parseFloat(vpVolume.value);
+            vid.muted = vid.volume === 0;
+            vpMuteIcon.className = vid.muted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
+        });
 
-        vpSeekbar.addEventListener('input', () => { vid.currentTime = parseFloat(vpSeekbar.value); });
+        vpSeekbar.addEventListener('input', e => {
+            e.stopPropagation();
+            if (vid.duration) vid.currentTime = (parseFloat(vpSeekbar.value) / 1000) * vid.duration;
+        });
 
-        vpFullscreen.addEventListener('click', () => {
-            if (!document.fullscreenElement) {
-                (vpMain.requestFullscreen?.() || vid.webkitEnterFullscreen?.() || vid.requestFullscreen?.());
-                vpFullscreen.innerHTML = '<i class="fas fa-compress"></i>';
+        vpFullscreen.addEventListener('click', e => {
+            e.stopPropagation();
+            const fsEl = vpMain;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                (fsEl.requestFullscreen?.() || fsEl.webkitRequestFullscreen?.() || vid.webkitEnterFullscreen?.());
+                vpFsIcon.className = 'fas fa-compress';
             } else {
-                document.exitFullscreen?.();
-                vpFullscreen.innerHTML = '<i class="fas fa-expand"></i>';
+                (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
+                vpFsIcon.className = 'fas fa-expand';
             }
         });
 
         document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement) vpFullscreen.innerHTML = '<i class="fas fa-expand"></i>';
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                vpFsIcon.className = 'fas fa-expand';
+            }
+        });
+        document.addEventListener('webkitfullscreenchange', () => {
+            if (!document.webkitFullscreenElement) vpFsIcon.className = 'fas fa-expand';
         });
 
         vpMain.addEventListener('click', e => {
-            if (!e.target.closest('.vid-btn') && !e.target.closest('.video-seekbar') && !e.target.closest('.vid-volume')) {
-                if (wrap.classList.contains('controls-visible') && !vid.paused) {
-                    // Toggle play on tap
-                    vid.pause();
-                }
-                showControls();
-            }
+            if (e.target.closest('button') || e.target.closest('input')) return;
+            showControls();
         });
 
-        vpMain.addEventListener('touchstart', showControls, { passive: true });
+        vpMain.addEventListener('touchstart', e => {
+            if (e.target.closest('button') || e.target.closest('input')) return;
+            showControls();
+        }, { passive: true });
 
-        // Auto play
-        vid.play().catch(() => { });
+        overlay.addEventListener('click', e => e.stopPropagation());
+
+        // Auto play with retry
         showControls();
+        const playPromise = vid.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(err => {
+                console.warn('Autoplay blocked:', err);
+                updatePlayUI();
+                overlay.style.opacity = '1';
+            });
+        }
     }
 
     // ===== MODAL EVENTS =====
