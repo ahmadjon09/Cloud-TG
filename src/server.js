@@ -137,7 +137,7 @@ export function startServer() {
     });
 
 
-    const TG_FILE_MAX = 50 * 1024 * 1024;
+    const TG_FILE_MAX = 1024 * 1024 * 1024;
 
     app.get("/api/files/:id/download", webAppAuthMiddleware, async (req, res) => {
         const owner = req.webAppUser.id;
