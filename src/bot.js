@@ -1267,7 +1267,7 @@ Send /cancel to abort.
 📁 <b>Type:</b> ${kind}
 💾 <b>Size:</b> ${formatFileSize(fileSize)}
 ⚡️ <b>Points earned:</b> +10 pts
-🆔 <b>ID:</b> <code>${file._id.slice(0, 7)}</code>
+🆔 <b>ID:</b> <code>${file._id}</code>
 
 Open the Cloud to manage, rename, or download your files.
 Earn more points by inviting friends!
