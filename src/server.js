@@ -59,6 +59,7 @@ export function startServer() {
             createdAt: x.createdAt
         })));
     });
+    
     app.get("/api/files/:id/preview", webAppAuthMiddleware, async (req, res) => {
         const owner = req.webAppUser.id;
         const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();

@@ -1,4 +1,7 @@
 tg-cloud/
+  cert/
+     loc.pem
+     loc.pem
   src/
     index.js
     bot.js
@@ -10,6 +13,8 @@ tg-cloud/
       User.js
       File.js
   public/
+    app.css
+    app.js
     app.html
   package.json
   .env
