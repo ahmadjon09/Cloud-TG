@@ -12,9 +12,6 @@
         initData = tg.initData || "";
         user = tg.initDataUnsafe?.user;
         if (tg.colorScheme) document.body.setAttribute('data-tg-theme', tg.colorScheme);
-        tg.MainButton.setText('📤 Upload File');
-        tg.MainButton.onClick(() => showToast('Send files to the bot in Telegram', 'info'));
-        tg.MainButton.show();
     } else {
         initData = "test_init_data";
         user = { id: "123456789", username: "test_user", first_name: "Test", last_name: "User" };

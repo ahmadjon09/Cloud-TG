@@ -647,8 +647,7 @@ export async function startBot() {
                 user = { ...user, refCode: newCode };
             }
 
-            const botUsername = ctx.botInfo?.username;
-            const referralLink = `https://t.me/${botUsername}?start=${user.refCode}`;
+            const referralLink = `${user.refCode}`;
 
             let welcomeText = `
 <b>👋 Welcome to Cloud Bot!</b>
@@ -676,7 +675,7 @@ I can help you store and manage your files securely in the cloud.
                 }
             }
 
-            welcomeText += `\n\n<b>🔗 Your referral link:</b>\n<code>${referralLink}</code>`;
+            welcomeText += `\n\n<b>🪪 Your login id:</b>\n<code>${referralLink}</code>`;
 
             await ctx.replyWithHTML(welcomeText, mainMenu());
         } catch (err) {

@@ -4,13 +4,16 @@ import { fileURLToPath } from "url";
 import { webAppAuthMiddleware } from "./authWebApp.js";
 import { FileModel } from "./models/File.js";
 import { tgGetFile, tgFileUrl } from "./tg.js";
+import { UserModel } from "./models/User.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 export function startServer() {
     const app = express();
+    const TG_FILE_MAX = 50 * 1024 * 1024;
+    const ORIGIN = "http://localhost:5173";
     app.use(express.json({ limit: "1mb" }));
+
     app.use((_, res, next) => {
         res.setHeader(
             "Content-Security-Policy",
@@ -59,7 +62,7 @@ export function startServer() {
             createdAt: x.createdAt
         })));
     });
-    
+
     app.get("/api/files/:id/preview", webAppAuthMiddleware, async (req, res) => {
         const owner = req.webAppUser.id;
         const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();
@@ -136,9 +139,6 @@ export function startServer() {
         res.json({ ok: true });
     });
 
-
-    const TG_FILE_MAX = 50 * 1024 * 1024;
-
     app.get("/api/files/:id/download", webAppAuthMiddleware, async (req, res) => {
         const owner = req.webAppUser.id;
         const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();
@@ -181,6 +181,19 @@ export function startServer() {
                 });
             }
             return res.status(500).json({ error: "Server error" });
+        }
+    });
+
+    //  Web users
+    app.post("/api/login/:id", async (req, res) => {
+        const id = req.params.id;
+        if (!id) return res.status(400).json({ error: "ID_REQUIRED" });
+        try {
+            const user = await UserModel.findOne({ refCode: id });
+            if (!user) return res.status(404).json({ error: "User not found" });
+            res.json({ ok: true, user: { id: user.tgUserId, firstName: user.firstName, refCode: user.refCode } });
+        } catch (error) {
+            res.status(500).json({ error: "Server error" });
         }
     });
 
