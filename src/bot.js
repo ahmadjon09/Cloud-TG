@@ -518,7 +518,7 @@ async function handleInline(ctx) {
                             document_file_id: fileId,
 
                             title: (
-                                f.fileName ||
+                                f?.fileName ||
                                 "File"
                             ).slice(0, 64),
 
