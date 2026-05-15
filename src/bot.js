@@ -1,21 +1,33 @@
-// bot.js - Optimized Telegram Bot (No Redis, In-Memory Cache)
+// bot.js - Ultra-Fast Cloud Bot (English Only, Full Inline) — PRODUCTION FIXED
 import { Telegraf, Markup, session } from "telegraf";
 import { UserModel } from "./models/User.js";
 import { FileModel } from "./models/File.js";
 import { version } from "../i.js";
 import crypto from "crypto";
 
-// ==================== IN-MEMORY CACHE ====================
-
-const cache = new Map();
-
-const CACHE_TTL = {
-    USER: 300_000,        // 5 minutes
-    LEADERBOARD: 60_000,  // 1 minute
-    STATS: 120_000,       // 2 minutes
-    RANK: 60_000,         // 1 minute
-    ADMIN: 60_000         // 1 minute
+// ==================== CONFIG ====================
+const CONFIG = {
+    CACHE_TTL: {
+        USER: 300_000,    // 5 min
+        STATS: 120_000,   // 2 min
+        FILES: 60_000,    // 1 min
+        ADMIN: 60_000     // 1 min
+    },
+    RATE_LIMIT: {
+        window: 60_000,
+        maxRequests: 25
+    },
+    FILE_LIMITS: {
+        document: 50 * 1024 * 1024,
+        video: 50 * 1024 * 1024,
+        audio: 50 * 1024 * 1024,
+        voice: 50 * 1024 * 1024,
+        photo: 10 * 1024 * 1024
+    }
 };
+
+// ==================== IN-MEMORY CACHE ====================
+const cache = new Map();
 
 const memoryCache = {
     set(key, value, ttl) {
@@ -30,1184 +42,1408 @@ const memoryCache = {
         }
         return item.value;
     },
-    del(key) {
-        cache.delete(key);
-    },
+    del(key) { cache.delete(key); },
     delPattern(pattern) {
-        // Escape regex special chars, then turn * into .*
         const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*");
         const regex = new RegExp(`^${escaped}$`);
         for (const key of cache.keys()) {
             if (regex.test(key)) cache.delete(key);
         }
     },
-    clear() {
-        cache.clear();
-    }
+    clear() { cache.clear(); }
 };
 
-// ==================== UTILITY FUNCTIONS ====================
+// ==================== RATE LIMITER ====================
+const rateLimitMap = new Map();
 
-function escapeHtml(text) {
-    if (!text) return "";
-    return String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-}
+function checkRateLimit(userId) {
+    const now = Date.now();
+    if (!rateLimitMap.has(userId)) rateLimitMap.set(userId, []);
+    const requests = rateLimitMap.get(userId);
 
-function formatFileSize(bytes) {
-    if (!bytes || bytes === 0) return "0 B";
-    const units = ["B", "KB", "MB", "GB", "TB"];
-    let size = bytes;
-    let i = 0;
-    while (size >= 1024 && i < units.length - 1) {
-        size /= 1024;
-        i++;
+    while (requests.length && now - requests[0] >= CONFIG.RATE_LIMIT.window) {
+        requests.shift();
     }
-    return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+
+    if (requests.length >= CONFIG.RATE_LIMIT.maxRequests) return false;
+    requests.push(now);
+    return true;
 }
 
-function formatError(error) {
-    const msg = error?.message || String(error) || "Unknown error";
-    return `❌ <b>Error:</b>\n<code>${escapeHtml(msg.substring(0, 300))}</code>`;
-}
+// ==================== UTILS ====================
+const escapeHtml = (text) =>
+    text ? String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;") : "";
 
-function isAdmin(userId) {
-    if (!userId) return false;
-    const raw = process.env.ADMIN_IDS || "";
-    const adminSet = new Set(raw.split(",").map(s => s.trim()).filter(Boolean));
-    return adminSet.has(String(userId));
-}
+const formatFileSize = (bytes) => {
+    if (!bytes) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    let i = 0, size = bytes;
+    while (size >= 1024 && i < units.length - 1) { size /= 1024; i++; }
+    return `${size.toFixed(i ? 1 : 0)} ${units[i]}`;
+};
 
-function webAppUrl() {
-    return `${process.env.BASE_URL}/app`;
-}
+const formatTime = (date) => {
+    const diff = Date.now() - new Date(date);
+    const m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), d = Math.floor(diff / 86400000);
+    return d ? `${d}d ago` : h ? `${h}h ago` : m ? `${m}m ago` : "just now";
+};
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
+const formatError = (err) =>
+    `❌ <b>Error</b>\n<code>${escapeHtml((err?.message || String(err)).slice(0, 400))}</code>`;
 
-function invalidateUserCache(userId) {
-    memoryCache.del(`user:${userId}`);
-    memoryCache.del(`stats:${userId}`);
-    memoryCache.del(`rank:${userId}`);
+const isAdmin = (id) =>
+    process.env.ADMIN_IDS?.split(",").map(s => s.trim()).includes(String(id));
+
+const webAppUrl = () => {
+    const base = process.env.BASE_URL;
+    if (!base || !base.startsWith('https://')) return null;
+    return `${base}/app`;
+};
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+const invalidateUser = (id) => {
+    memoryCache.del(`user:${id}`);
+    memoryCache.del(`stats:${id}`);
+    memoryCache.delPattern(`files:${id}:*`);
+};
+
+// ==================== SESSION SAFE ====================
+function ensureSession(ctx) {
+    if (!ctx.session) ctx.session = {};
+    return ctx.session;
 }
 
 // ==================== MESSAGE HELPERS ====================
-
-async function safeEditMessage(ctx, text, keyboard, parseMode = "HTML") {
+async function safeEdit(ctx, text, keyboard) {
     try {
+        const rm = keyboard?.reply_markup ?? keyboard;
         await ctx.editMessageText(text, {
-            parse_mode: parseMode,
-            reply_markup: keyboard?.reply_markup,
+            parse_mode: "HTML",
+            reply_markup: rm,
             disable_web_page_preview: true
         });
-    } catch (err) {
-        // Silently ignore "not modified"  everything else re-throw
-        if (err?.code === 400 && err?.description?.includes("message is not modified")) return;
-        // If original message was deleted, fall back to a new reply
-        if (err?.code === 400 && err?.description?.includes("message to edit not found")) {
-            await ctx.reply(text, { parse_mode: parseMode, reply_markup: keyboard?.reply_markup });
+    } catch (e) {
+        if (e?.code === 400 && e.description?.includes("not modified")) return;
+        if (e?.code === 400 && e.description?.includes("not found")) {
+            await ctx.reply(text, { parse_mode: "HTML", reply_markup: keyboard?.reply_markup });
             return;
         }
-        throw err;
+        throw e;
     }
 }
 
-async function withLoading(ctx, fn) {
+async function withLoading(ctx, fn, msg = "⏳ Processing...") {
+    let loadMsg;
     try {
-        return await fn();
-    } catch (error) {
-        console.error("Handler error:", error.message);
-        try {
-            await ctx.reply(formatError(error), { parse_mode: "HTML" });
-        } catch { /* ignore send errors */ }
+        loadMsg = await ctx.reply(msg);
+        const res = await fn();
+        await ctx.deleteMessage(loadMsg.message_id).catch(() => { });
+        return res;
+    } catch (err) {
+        if (loadMsg) await ctx.deleteMessage(loadMsg.message_id).catch(() => { });
+        console.error("Handler error:", err.message);
+        await ctx.reply(formatError(err), { parse_mode: "HTML" }).catch(() => { });
     }
 }
 
-// ==================== KEYBOARDS ====================
+// ==================== KEYBOARDS (ALL INLINE) ====================
+const KB = {
+    main: (uid) => {
+        const appUrl = webAppUrl();
+        return Markup.inlineKeyboard([
+            ...(appUrl ? [[Markup.button.webApp("☁️ Open Cloud", appUrl)]] : []),
+            [Markup.button.callback("📁 My Files", "MY_FILES"), Markup.button.callback("🔍 Search", "SEARCH_MAIN")],
+            [Markup.button.callback("📂 Folders", "FOLDERS_MAIN"), Markup.button.callback("⏰ Expiring", "EXPIRING_MAIN")],
+            [Markup.button.callback("🔗 Share", "SHARE_MAIN"), Markup.button.callback("⚙️ Settings", "SETTINGS_MAIN")],
+            [Markup.button.callback("ℹ️ About", "ABOUT"), Markup.button.callback("🆘 Help", "HELP")]
+        ]);
+    },
 
-function mainMenu(showBack = false) {
-    const buttons = [
-        [Markup.button.webApp("📂 Open Cloud", webAppUrl())],
-        [
-            Markup.button.callback("📊 My Files", "MY_FILES"),
-            Markup.button.callback("📈 Limits", "LIMITS")
-        ],
-        [
-            Markup.button.callback("👥 Referrals", "REFERRALS"),
-            Markup.button.callback("🏆 Leaderboard", "LEADERBOARD")
-        ],
-        [
-            Markup.button.callback("ℹ️ About", "ABOUT"),
-            Markup.button.callback("🆘 Help", "HELP")
-        ]
-    ];
-    if (showBack) {
-        buttons.push([Markup.button.callback("🔙 Back to Main", "MAIN_MENU")]);
+    files: (fileId) => Markup.inlineKeyboard([
+        [Markup.button.callback("📥 Download", `DL:${fileId}`), Markup.button.callback("🔗 Share", `SHARE_SELECT:${fileId}`)],
+        [Markup.button.callback("✏️ Rename", `RENAME:${fileId}`), Markup.button.callback("🗑️ Delete", `DELETE:${fileId}`)],
+        [Markup.button.callback("🔒 Toggle Private", `PRIV:${fileId}`), Markup.button.callback("⏰ Set Expiry", `EXP:${fileId}`)],
+        [Markup.button.callback("📂 Move", `MOVE:${fileId}`), Markup.button.callback("🔙 Back", "MY_FILES")]
+    ]),
+
+    folders: () => Markup.inlineKeyboard([
+        [Markup.button.callback("➕ New Folder", "FOLDER_CREATE")],
+        [Markup.button.callback("📂 View All", "FOLDER_LIST")],
+        [Markup.button.callback("🗂️ Move Files", "FOLDER_MOVE_SELECT")],
+        [Markup.button.callback("🔙 Back", "MAIN")]
+    ]),
+
+    // ✅ FIX: switch_inline_query_current_chat now properly configured
+    search: () => Markup.inlineKeyboard([
+        [{ text: "🔍 Search files...", switch_inline_query_current_chat: "" }],
+        [Markup.button.callback("📄 Docs", "SRCH:document"), Markup.button.callback("🖼 Photos", "SRCH:photo")],
+        [Markup.button.callback("🎥 Video", "SRCH:video"), Markup.button.callback("🎵 Audio", "SRCH:audio")],
+        [Markup.button.callback("🗑️ Clear Filter", "SRCH:CLEAR"), Markup.button.callback("🔙 Back", "MAIN")]
+    ]),
+
+    settings: (user) => {
+        const notifOn = user?.settings?.notifications !== false;
+        const privOn = user?.settings?.privateByDefault === true;
+        return Markup.inlineKeyboard([
+            [
+                Markup.button.callback(`🔔 Notif: ${notifOn ? "ON" : "OFF"}`, `SET:NOTIF:${notifOn ? "off" : "on"}`),
+                Markup.button.callback(`🔐 Private: ${privOn ? "ON" : "OFF"}`, "SET:PRIV:toggle")
+            ],
+            [Markup.button.callback("⏰ Auto-Expire", "SET:EXPIRE:menu")],
+            [Markup.button.callback("🗑️ Clear My Cache", "SET:CACHE"), Markup.button.callback("📊 My Stats", "SET:STATS")],
+            [Markup.button.callback("🔙 Back", "MAIN")]
+        ]);
+    },
+
+    expireMenu: () => Markup.inlineKeyboard([
+        [Markup.button.callback("24 hours", "EXPSET:24h"), Markup.button.callback("7 days", "EXPSET:7d")],
+        [Markup.button.callback("30 days", "EXPSET:30d"), Markup.button.callback("90 days", "EXPSET:90d")],
+        [Markup.button.callback("❌ Remove", "EXPSET:none"), Markup.button.callback("🔙 Cancel", "CANCEL_ACTION")]
+    ]),
+
+    expireMenuForFile: () => Markup.inlineKeyboard([
+        [Markup.button.callback("24 hours", "FILE_EXPSET:24h"), Markup.button.callback("7 days", "FILE_EXPSET:7d")],
+        [Markup.button.callback("30 days", "FILE_EXPSET:30d"), Markup.button.callback("90 days", "FILE_EXPSET:90d")],
+        [Markup.button.callback("❌ Remove", "FILE_EXPSET:none"), Markup.button.callback("🔙 Cancel", "CANCEL_ACTION")]
+    ]),
+
+    confirm: (action, id) => Markup.inlineKeyboard([
+        [Markup.button.callback(`✅ Yes`, `CONFIRM:${action}:${id}`)],
+        [Markup.button.callback("❌ Cancel", `CANCEL_ACTION`)]
+    ]),
+
+    admin: () => Markup.inlineKeyboard([
+        [Markup.button.callback("📊 Stats", "ADM:STATS"), Markup.button.callback("📢 Broadcast", "ADM:BROADCAST")],
+        [Markup.button.callback("🧹 Cleanup", "ADM:CLEANUP"), Markup.button.callback("👥 Users", "ADM:USERS")],
+        [Markup.button.callback("🗑️ Clear All Cache", "ADM:CACHE"), Markup.button.callback("🔙 Back", "MAIN")]
+    ]),
+
+    pagination: (page, hasMore, baseAction) => {
+        const rows = [];
+        const nav = [];
+        if (page > 0) nav.push(Markup.button.callback("⏮ Prev", `${baseAction}:${page - 1}`));
+        if (hasMore) nav.push(Markup.button.callback("⏭ Next", `${baseAction}:${page + 1}`));
+        if (nav.length) rows.push(nav);
+        rows.push([Markup.button.callback("🔙 Back", "MAIN")]);
+        return Markup.inlineKeyboard(rows);
     }
-    return Markup.inlineKeyboard(buttons);
-}
+};
 
-function referralMenu() {
-    return Markup.inlineKeyboard([
-        [Markup.button.callback("📊 My Stats", "REFERRAL_STATS")],
-        [Markup.button.callback("🏆 Leaderboard", "LEADERBOARD")],
-        [Markup.button.callback("🎁 Claim Rewards", "CLAIM_REWARDS")],
-        [Markup.button.callback("🔙 Back", "MAIN_MENU")]
-    ]);
-}
-
-function leaderboardMenu() {
-    return Markup.inlineKeyboard([
-        [Markup.button.callback("📅 Weekly", "WEEKLY_LEADERBOARD")],
-        [Markup.button.callback("📆 Monthly", "MONTHLY_LEADERBOARD")],
-        [Markup.button.callback("👤 My Rank", "MY_RANK")],
-        [Markup.button.callback("🔙 Back", "MAIN_MENU")]
-    ]);
-}
-
-function adminMenu() {
-    return Markup.inlineKeyboard([
-        [Markup.button.callback("📊 Stats", "ADMIN_STATS")],
-        [Markup.button.callback("📢 Broadcast", "ADMIN_BROADCAST")],
-        [Markup.button.callback("🎁 Give Rewards", "ADMIN_GIVE_REWARDS")],
-        [Markup.button.callback("🔙 Back to Main", "MAIN_MENU")]
-    ]);
-}
-
-// ==================== DATABASE INDEXES ====================
-
+// ==================== DB INDEXES ====================
 async function ensureIndexes() {
     try {
         await Promise.all([
             UserModel.collection.createIndex({ tgUserId: 1 }, { unique: true }),
-            UserModel.collection.createIndex({ refCode: 1 }, { unique: true, sparse: true }),
-            UserModel.collection.createIndex({ referredBy: 1 }),
-            UserModel.collection.createIndex({ weekScore: -1 }),
-            UserModel.collection.createIndex({ monthScore: -1 }),
-            UserModel.collection.createIndex({ createdAt: -1 }),
             UserModel.collection.createIndex({ lastActiveAt: -1 }),
-            UserModel.collection.createIndex({ isBlocked: 1 }),
+            UserModel.collection.createIndex({ username: 1 }, { sparse: true }),
+
             FileModel.collection.createIndex({ ownerTgUserId: 1, createdAt: -1 }),
+            FileModel.collection.createIndex({ ownerTgUserId: 1, fileName: "text" }),
+            FileModel.collection.createIndex({ tgFileId: 1 }, { unique: true }),
             FileModel.collection.createIndex({ tgUniqueId: 1 }, { unique: true, sparse: true }),
-            FileModel.collection.createIndex({ kind: 1 })
+            FileModel.collection.createIndex({ kind: 1 }),
+            FileModel.collection.createIndex({ folderId: 1 }),
+            FileModel.collection.createIndex({ isPrivate: 1 }),
+            FileModel.collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+            FileModel.collection.createIndex({ sharedWith: 1 })
         ]);
-        console.log("✅ Database indexes created");
-    } catch (err) {
-        console.error("Index creation error:", err.message);
-    }
+        console.log("✅ Indexes ready");
+    } catch (e) { console.error("Index error:", e.message); }
 }
 
-// ==================== REFERRAL FUNCTIONS ====================
+// ==================== USER OPS ====================
+async function upsertUser(ctx) {
+    const u = ctx.from || {};
+    const id = String(u.id);
+    const key = `user:${id}`;
 
-export async function generateReferralCode(tgUserId, firstName = "") {
-    const namePart = firstName && typeof firstName === "string"
-        ? firstName.slice(0, 3).toUpperCase().replace(/[^A-Z]/g, "X")
-        : "USR";
+    const fields = {
+        firstName: u.first_name || "",
+        lastName: u.last_name || "",
+        username: (u.username || "").toLowerCase(),
+        lastActiveAt: new Date()
+    };
 
-    // Generate 5 candidates at once to minimise DB round-trips
-    const candidates = Array.from({ length: 5 }, () =>
-        `${namePart}${crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 6)}`.slice(0, 10)
-    );
-
-    const existing = await UserModel.find(
-        { refCode: { $in: candidates } },
-        { refCode: 1 }
-    ).lean();
-
-    const existingSet = new Set(existing.map(e => e.refCode));
-
-    for (const candidate of candidates) {
-        if (!existingSet.has(candidate)) return candidate;
+    if (memoryCache.get(key)) {
+        UserModel.updateOne({ tgUserId: id }, { $set: fields }).catch(() => { });
+        return id;
     }
 
-    // Fallback: timestamp guarantees uniqueness
-    return `REF${Date.now().toString(36).toUpperCase()}${crypto.randomBytes(2).toString("hex").toUpperCase()}`.slice(0, 14);
-}
-
-async function processReferral(newUserId, referralCode) {
-    if (!referralCode) return null;
-    try {
-        const referrer = await UserModel.findOne(
-            { refCode: referralCode },
-            { tgUserId: 1 }
-        ).lean();
-
-        if (!referrer || referrer.tgUserId === newUserId) return null;
-
-        await Promise.all([
-            UserModel.updateOne({ tgUserId: newUserId }, { $set: { referredBy: referrer.tgUserId } }),
-            UserModel.updateOne({ tgUserId: referrer.tgUserId }, { $inc: { refCount: 1 } })
-        ]);
-
-        invalidateUserCache(newUserId);
-        invalidateUserCache(referrer.tgUserId);
-
-        return referrer;
-    } catch (err) {
-        console.error("processReferral error:", err.message);
-        return null;
+    let user = await UserModel.findOne({ tgUserId: id }).lean();
+    if (!user) {
+        user = await UserModel.create({
+            tgUserId: id, ...fields, startedAt: new Date(),
+            storageUsed: 0, fileCount: 0, folderIds: [],
+            settings: { notifications: true, privateByDefault: false, autoExpire: null }
+        });
+    } else {
+        await UserModel.updateOne({ tgUserId: id }, { $set: fields });
     }
+
+    const fresh = await UserModel.findOne({ tgUserId: id }).lean();
+    memoryCache.set(key, fresh, CONFIG.CACHE_TTL.USER);
+    return id;
 }
 
-// ==================== LEADERBOARD FUNCTIONS ====================
-
-// Shared aggregation pipeline builder (avoids code duplication)
-function buildLeaderboardAggregate(dateFilter, scoreField, filesAlias, refsAlias) {
-    return [
-        {
-            $lookup: {
-                from: "files",
-                let: { uid: "$tgUserId" },
-                pipeline: [
-                    {
-                        $match: {
-                            $expr: {
-                                $and: [
-                                    { $eq: ["$ownerTgUserId", "$$uid"] },
-                                    { $gte: ["$createdAt", dateFilter] }
-                                ]
-                            }
-                        }
-                    },
-                    { $count: "count" }
-                ],
-                as: "_files"
-            }
-        },
-        {
-            $lookup: {
-                from: "users",
-                let: { uid: "$tgUserId" },
-                pipeline: [
-                    {
-                        $match: {
-                            $expr: {
-                                $and: [
-                                    { $eq: ["$referredBy", "$$uid"] },
-                                    { $gte: ["$createdAt", dateFilter] }
-                                ]
-                            }
-                        }
-                    },
-                    { $count: "count" }
-                ],
-                as: "_refs"
-            }
-        },
-        {
-            $addFields: {
-                [filesAlias]: { $ifNull: [{ $arrayElemAt: ["$_files.count", 0] }, 0] },
-                [refsAlias]: { $ifNull: [{ $arrayElemAt: ["$_refs.count", 0] }, 0] }
-            }
-        },
-        {
-            $addFields: {
-                [scoreField]: {
-                    $add: [
-                        { $multiply: [`$${filesAlias}`, 10] },
-                        { $multiply: [`$${refsAlias}`, 50] }
-                    ]
-                }
-            }
-        },
-        { $match: { [scoreField]: { $gt: 0 } } },
-        { $sort: { [scoreField]: -1, [filesAlias]: -1 } }
-    ];
-}
-
-async function calculateWeeklyLeaderboard(limit = 10) {
-    const cacheKey = `leaderboard:weekly:${limit}`;
-    const cached = memoryCache.get(cacheKey);
+async function getUserStats(uid) {
+    const key = `stats:${uid}`;
+    const cached = memoryCache.get(key);
     if (cached) return cached;
 
     try {
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-
-        const leaderboard = await UserModel.aggregate([
-            ...buildLeaderboardAggregate(weekAgo, "weekScore", "weeklyFiles", "weeklyReferrals"),
-            { $limit: limit },
-            {
-                $project: {
-                    tgUserId: 1, firstName: 1, lastName: 1, username: 1,
-                    weekScore: 1, weeklyFiles: 1, weeklyReferrals: 1
-                }
-            }
-        ]);
-
-        if (leaderboard.length > 0) {
-            UserModel.bulkWrite(
-                leaderboard.map(u => ({
-                    updateOne: {
-                        filter: { tgUserId: u.tgUserId },
-                        update: { $set: { weekScore: u.weekScore } }
-                    }
-                })),
-                { ordered: false }
-            ).catch(() => { });
-        }
-
-        memoryCache.set(cacheKey, leaderboard, CACHE_TTL.LEADERBOARD);
-        return leaderboard;
-    } catch (err) {
-        console.error("calculateWeeklyLeaderboard error:", err.message);
-        return [];
-    }
-}
-
-async function calculateMonthlyLeaderboard(limit = 10) {
-    const cacheKey = `leaderboard:monthly:${limit}`;
-    const cached = memoryCache.get(cacheKey);
-    if (cached) return cached;
-
-    try {
-        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-        const leaderboard = await UserModel.aggregate([
-            ...buildLeaderboardAggregate(monthAgo, "monthScore", "monthlyFiles", "monthlyReferrals"),
-            { $limit: limit },
-            {
-                $project: {
-                    tgUserId: 1, firstName: 1, lastName: 1, username: 1,
-                    monthScore: 1, monthlyFiles: 1, monthlyReferrals: 1
-                }
-            }
-        ]);
-
-        if (leaderboard.length > 0) {
-            UserModel.bulkWrite(
-                leaderboard.map(u => ({
-                    updateOne: {
-                        filter: { tgUserId: u.tgUserId },
-                        update: { $set: { monthScore: u.monthScore } }
-                    }
-                })),
-                { ordered: false }
-            ).catch(() => { });
-        }
-
-        memoryCache.set(cacheKey, leaderboard, CACHE_TTL.LEADERBOARD);
-        return leaderboard;
-    } catch (err) {
-        console.error("calculateMonthlyLeaderboard error:", err.message);
-        return [];
-    }
-}
-
-async function getUserRank(tgUserId) {
-    const cacheKey = `rank:${tgUserId}`;
-    const cached = memoryCache.get(cacheKey);
-    if (cached) return cached;
-
-    try {
-        const user = await UserModel.findOne({ tgUserId }, { weekScore: 1, monthScore: 1 }).lean();
-        if (!user) return null;
-
-        const [weeklyRank, monthlyRank, totalUsers] = await Promise.all([
-            UserModel.countDocuments({ weekScore: { $gt: user.weekScore || 0 } }),
-            UserModel.countDocuments({ monthScore: { $gt: user.monthScore || 0 } }),
-            UserModel.estimatedDocumentCount()
-        ]);
-
-        const result = {
-            weekly: weeklyRank + 1,
-            monthly: monthlyRank + 1,
-            totalUsers
-        };
-
-        memoryCache.set(cacheKey, result, CACHE_TTL.RANK);
-        return result;
-    } catch (err) {
-        console.error("getUserRank error:", err.message);
-        return null;
-    }
-}
-
-async function getUserStats(tgUserId) {
-    const cacheKey = `stats:${tgUserId}`;
-    const cached = memoryCache.get(cacheKey);
-    if (cached) return cached;
-
-    try {
-        const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-
-        const [user, fileStats, referralStats] = await Promise.all([
-            UserModel.findOne({ tgUserId }).lean(),
+        const [user, stats] = await Promise.all([
+            UserModel.findOne({ tgUserId: uid }).lean(),
             FileModel.aggregate([
-                { $match: { ownerTgUserId: tgUserId } },
+                { $match: { ownerTgUserId: uid, isDeleted: { $ne: true } } },
                 {
                     $facet: {
-                        total: [{ $count: "count" }],
-                        weekly: [{ $match: { createdAt: { $gte: weekAgo } } }, { $count: "count" }],
-                        monthly: [{ $match: { createdAt: { $gte: monthAgo } } }, { $count: "count" }]
-                    }
-                }
-            ]),
-            UserModel.aggregate([
-                { $match: { referredBy: tgUserId } },
-                {
-                    $facet: {
-                        weekly: [{ $match: { createdAt: { $gte: weekAgo } } }, { $count: "count" }],
-                        monthly: [{ $match: { createdAt: { $gte: monthAgo } } }, { $count: "count" }]
+                        total: [{ $count: "c" }],
+                        size: [{ $group: { _id: null, total: { $sum: "$fileSize" } } }],
+                        byKind: [{ $group: { _id: "$kind", count: { $sum: 1 }, size: { $sum: "$fileSize" } } }],
+                        recent: [
+                            { $sort: { createdAt: -1 } },
+                            { $limit: 5 },
+                            { $project: { fileName: 1, kind: 1, fileSize: 1, createdAt: 1, isPrivate: 1 } }
+                        ]
                     }
                 }
             ])
         ]);
 
         if (!user) return null;
-
-        const fd = fileStats[0] || {};
-        const rd = referralStats[0] || {};
-
-        const totalFiles = fd.total?.[0]?.count || 0;
-        const weeklyFiles = fd.weekly?.[0]?.count || 0;
-        const monthlyFiles = fd.monthly?.[0]?.count || 0;
-        const weeklyReferrals = rd.weekly?.[0]?.count || 0;
-        const monthlyReferrals = rd.monthly?.[0]?.count || 0;
-
-        const weekScore = weeklyFiles * 10 + weeklyReferrals * 50;
-        const monthScore = monthlyFiles * 10 + monthlyReferrals * 50;
-
-        // Persist scores in background  don't block the response
-        UserModel.updateOne({ tgUserId }, { $set: { weekScore, monthScore } }).catch(() => { });
-
+        const s = stats[0] || {};
         const result = {
             user,
-            weeklyFiles, monthlyFiles,
-            weeklyReferrals, monthlyReferrals,
-            totalFiles,
-            totalReferrals: user.refCount || 0,
-            weekScore, monthScore,
-            diamonds: user.diamonds || 0
+            totalFiles: s.total?.[0]?.c || 0,
+            totalSize: s.size?.[0]?.total || 0,
+            byKind: s.byKind || [],
+            recent: s.recent || []
         };
-
-        memoryCache.set(cacheKey, result, CACHE_TTL.STATS);
+        memoryCache.set(key, result, CONFIG.CACHE_TTL.STATS);
         return result;
-    } catch (err) {
-        console.error("getUserStats error:", err.message);
+    } catch (e) {
+        console.error("Stats error:", e.message);
         return null;
     }
 }
 
-// ==================== WEEKLY REWARDS ====================
+// ==================== FILE OPS ====================
+// ✅ FIX: searchFiles — escape regex special chars, ensure tgFileId selected
+async function searchFiles(uid, query, opts = {}) {
+    const {
+        kind,
+        folderId,
+        isPrivate,
+        limit = 20,
+        page = 0
+    } = opts;
 
-const REWARD_TABLE = [
-    { diamonds: 1000, title: "🥇 1st place", badge: "🏆" },
-    { diamonds: 500, title: "🥈 2nd place", badge: "⭐️" },
-    { diamonds: 250, title: "🥉 3rd place", badge: "🌟" },
-    { diamonds: 100, title: "Top 5", badge: "💫" },
-    { diamonds: 100, title: "Top 5", badge: "💫" },
-    { diamonds: 50, title: "Top 10", badge: "✨" },
-    { diamonds: 50, title: "Top 10", badge: "✨" },
-    { diamonds: 50, title: "Top 10", badge: "✨" },
-    { diamonds: 50, title: "Top 10", badge: "✨" },
-    { diamonds: 50, title: "Top 10", badge: "✨" }
-];
+    // regex escape
+    const escapedQuery = query.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&"
+    );
 
-async function calculateWeeklyRewards() {
-    const leaderboard = await calculateWeeklyLeaderboard(10);
-    const results = [];
-    const bulkOps = [];
-
-    for (let i = 0; i < leaderboard.length; i++) {
-        const user = leaderboard[i];
-        const reward = REWARD_TABLE[i];
-        if (!reward || !user?.tgUserId) continue;
-
-        bulkOps.push({
-            updateOne: {
-                filter: { tgUserId: user.tgUserId },
-                update: {
-                    $inc: { diamonds: reward.diamonds },
-                    $set: { refAwardedAt: new Date() }
-                }
-            }
-        });
-        results.push({ user, reward });
-    }
-
-    if (bulkOps.length > 0) {
-        await UserModel.bulkWrite(bulkOps, { ordered: false });
-        for (const { user } of results) invalidateUserCache(user.tgUserId);
-        memoryCache.delPattern("leaderboard:*");
-    }
-
-    return results;
-}
-
-// ==================== USER UPSERT ====================
-
-async function upsertUser(ctx, referralCode = null) {
-    const u = ctx.from || {};
-    const tgUserId = String(u.id);
-    const cacheKey = `user:${tgUserId}`;
-
-    const updateFields = {
-        firstName: u.first_name || "",
-        lastName: u.last_name || "",
-        username: u.username || "",
-        languageCode: u.language_code || "en",
-        lastActiveAt: new Date()
+    const match = {
+        ownerTgUserId: String(uid),
+        isDeleted: { $ne: true },
+        fileName: {
+            $regex: escapedQuery,
+            $options: "i"
+        }
     };
 
-    // If cached → update DB in background and return immediately
-    if (memoryCache.get(cacheKey)) {
-        UserModel.updateOne({ tgUserId }, { $set: updateFields }).catch(() => { });
-        return tgUserId;
+    if (kind) {
+        match.kind = kind;
     }
 
-    let user = await UserModel.findOne({ tgUserId }).lean();
+    if (folderId !== undefined) {
+        match.folderId = folderId || null;
+    }
 
-    if (!user) {
-        const refCode = await generateReferralCode(tgUserId, u.first_name);
+    if (isPrivate !== undefined) {
+        match.isPrivate = isPrivate;
+    }
 
-        user = await UserModel.create({
-            tgUserId,
-            ...updateFields,
-            startedAt: new Date(),
-            diamonds: 0,
-            refCode,
-            refCount: 0,
-            weekScore: 0,
-            monthScore: 0,
-            referredBy: null,
-            refAwardedAt: null
+    return FileModel.find(match)
+        .sort({ createdAt: -1 })
+        .skip(page * limit)
+        .limit(limit)
+        .select(`
+            fileName
+            kind
+            fileSize
+            createdAt
+            isPrivate
+            expiresAt
+            folderId
+            tgFileId
+            tgUniqueId
+        `)
+        .lean();
+}
+
+// -------------------------------
+
+// -------------------------------
+
+async function handleInline(ctx) {
+    const uid = String(ctx.from?.id);
+
+    const query = (
+        ctx.inlineQuery.query || ""
+    ).trim();
+
+    const offset =
+        ctx.inlineQuery.offset || "0";
+
+    const page =
+        parseInt(offset, 10) || 0;
+
+    if (!uid || query.length < 1) {
+        return ctx.answerInlineQuery([], {
+            cache_time: 30,
+            is_personal: true
         });
-
-        // Process referral in background  don't delay the welcome message
-        if (referralCode) {
-            processReferral(tgUserId, referralCode).catch(() => { });
-        }
-    } else {
-        await UserModel.updateOne({ tgUserId }, { $set: updateFields });
     }
 
-    const fresh = await UserModel.findOne({ tgUserId }).lean();
-    memoryCache.set(cacheKey, fresh, CACHE_TTL.USER);
+    try {
+        const LIMIT = 50;
 
-    return tgUserId;
+        const files = await searchFiles(
+            uid,
+            query,
+            {
+                limit: LIMIT,
+                page
+            }
+        );
+
+        const results = [];
+
+        for (const [idx, f] of files.entries()) {
+
+            // IMPORTANT
+            // tgUniqueId ishlatmaymiz
+            const fileId = f.tgFileId;
+
+            if (
+                !fileId ||
+                typeof fileId !== "string"
+            ) {
+                continue;
+            }
+
+            const resultId =
+                `f_${f._id}_${idx}`;
+
+            const safeFileName =
+                escapeHtml(
+                    f.fileName || "Untitled"
+                );
+
+            const caption =
+                `<b>${safeFileName}</b>
+
+📦 ${formatFileSize(f.fileSize)}
+🕐 ${formatTime(f.createdAt)}
+📁 ${(f.kind || "file").toUpperCase()}`;
+
+            const base = {
+                id: resultId,
+                caption,
+                parse_mode: "HTML"
+            };
+
+            try {
+
+                switch (f.kind) {
+
+                    case "photo":
+                        results.push({
+                            ...base,
+                            type: "photo",
+                            photo_file_id: fileId
+                        });
+                        break;
+
+                    case "video":
+                        results.push({
+                            ...base,
+                            type: "video",
+                            video_file_id: fileId,
+
+                            title: (
+                                f.fileName ||
+                                "Video"
+                            ).slice(0, 64),
+
+                            description:
+                                `VIDEO • ${formatFileSize(f.fileSize)}`
+                        });
+                        break;
+
+                    case "audio":
+                        results.push({
+                            ...base,
+                            type: "audio",
+                            audio_file_id: fileId,
+
+                            title: (
+                                f.fileName ||
+                                "Audio"
+                            ).slice(0, 64),
+
+                            caption,
+
+                            parse_mode: "HTML"
+                        });
+                        break;
+
+                    case "voice":
+                        results.push({
+                            ...base,
+                            type: "voice",
+                            voice_file_id: fileId
+                        });
+                        break;
+
+                    default:
+                        results.push({
+                            ...base,
+
+                            type: "document",
+
+                            document_file_id: fileId,
+
+                            title: (
+                                f.fileName ||
+                                "File"
+                            ).slice(0, 64),
+
+                            description:
+                                `${(f.kind || "FILE").toUpperCase()} • ${formatFileSize(f.fileSize)}`
+                        });
+                }
+
+            } catch (err) {
+                console.log(
+                    "[INLINE RESULT ERROR]",
+                    err.message
+                );
+            }
+        }
+
+        await ctx.answerInlineQuery(
+            results,
+            {
+                cache_time: 60,
+                is_personal: true,
+
+                next_offset:
+                    results.length >= LIMIT
+                        ? String(page + 1)
+                        : ""
+            }
+        );
+
+    } catch (e) {
+
+        console.error(
+            `[INLINE ERROR] uid=${uid} query="${query}"`,
+            e
+        );
+
+        try {
+            await ctx.answerInlineQuery(
+                [],
+                {
+                    cache_time: 1,
+                    is_personal: true
+                }
+            );
+        } catch { }
+    }
 }
 
-// ==================== LEADERBOARD FORMATTER ====================
-
-function formatLeaderboard(leaderboard, type = "weekly") {
-    if (!leaderboard?.length) return "No data yet. Be the first!";
-
-    return leaderboard.map((user, i) => {
-        const rank = i + 1;
-        const medal = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `${rank}.`;
-        const name = escapeHtml(user.firstName || user.username || "Anonymous");
-        const score = type === "weekly" ? user.weekScore : user.monthScore;
-        const files = type === "weekly" ? user.weeklyFiles : user.monthlyFiles;
-        const refs = type === "weekly" ? user.weeklyReferrals : user.monthlyReferrals;
-        return `${medal} <b>${name}</b>\n   📁 ${files} files | 👥 ${refs} refs | ⚡️ ${score} pts`;
-    }).join("\n\n");
+async function updateFile(uid, fid, updates) {
+    const res = await FileModel.findOneAndUpdate(
+        { _id: fid, ownerTgUserId: uid, isDeleted: { $ne: true } },
+        { $set: { ...updates, updatedAt: new Date() } },
+        { new: true, runValidators: true }
+    );
+    if (res) memoryCache.delPattern(`files:${uid}:*`);
+    return res;
 }
 
-// ==================== BOT STARTUP ====================
+async function softDelete(uid, fid) {
+    const file = await FileModel.findOne({ _id: fid, ownerTgUserId: uid, isDeleted: { $ne: true } }).lean();
+    if (!file) return null;
 
+    const res = await FileModel.findOneAndUpdate(
+        { _id: fid, ownerTgUserId: uid },
+        { $set: { isDeleted: true, deletedAt: new Date() } }
+    );
+    if (res) {
+        await UserModel.updateOne(
+            { tgUserId: uid },
+            { $inc: { storageUsed: -(file.fileSize || 0), fileCount: -1 } }
+        ).catch(() => { });
+        invalidateUser(uid);
+        setTimeout(() => FileModel.deleteOne({ _id: fid }).catch(() => { }), 30 * 86400000);
+    }
+    return res;
+}
+
+// ==================== FOLDER OPS ====================
+async function createFolder(uid, name, parent = null) {
+    const fid = crypto.randomUUID();
+    const folder = await UserModel.findOneAndUpdate(
+        { tgUserId: uid },
+        {
+            $push: {
+                folderIds: {
+                    _id: fid,
+                    name: escapeHtml(name.slice(0, 50)),
+                    parentId: parent,
+                    fileCount: 0,
+                    createdAt: new Date()
+                }
+            }
+        },
+        { new: true }
+    );
+    if (folder) {
+        invalidateUser(uid);
+        return folder.folderIds.find(f => f._id === fid);
+    }
+    return null;
+}
+
+async function moveFiles(uid, fileIds, folderId) {
+    const res = await FileModel.updateMany(
+        { _id: { $in: fileIds }, ownerTgUserId: uid },
+        { $set: { folderId: folderId || null, updatedAt: new Date() } }
+    );
+    if (res.modifiedCount && folderId) {
+        await UserModel.updateOne(
+            { tgUserId: uid, "folderIds._id": folderId },
+            { $inc: { "folderIds.$.fileCount": res.modifiedCount } }
+        );
+    }
+    if (res.modifiedCount) invalidateUser(uid);
+    return res;
+}
+
+
+// ==================== EXPIRY ====================
+const EXPIRY = { '24h': 86400000, '7d': 604800000, '30d': 2592000000, '90d': 7776000000 };
+
+async function setExpiry(uid, fid, dur) {
+    if (dur === 'none') return updateFile(uid, fid, { expiresAt: null });
+    const ms = EXPIRY[dur];
+    if (!ms) return null;
+    return updateFile(uid, fid, { expiresAt: new Date(Date.now() + ms) });
+}
+
+// ==================== BOT START ====================
 export async function startBot() {
-    if (!process.env.BOT_TOKEN) throw new Error("BOT_TOKEN env variable is missing!");
-    if (!process.env.BASE_URL) throw new Error("BASE_URL env variable is missing!");
+    if (!process.env.BOT_TOKEN || !process.env.BASE_URL) throw new Error("Missing env vars: BOT_TOKEN, BASE_URL");
 
     const bot = new Telegraf(process.env.BOT_TOKEN);
 
-    await ensureIndexes();
+    // ✅ FIX: Set inline query placeholder for better UX (requires BotFather setup)
+    try {
+        await bot.telegram.setMyCommands([
+            { command: "start", description: "🚀 Start bot" },
+            { command: "help", description: "🆘 Get help" },
+            { command: "admin", description: "👑 Admin panel" }
+        ]);
+        // Optional: Set inline query placeholder if bot supports it
+        // This requires calling setMyShortDescription or using BotFather
+    } catch (e) {
+        console.warn("⚠️ Could not set bot commands:", e.message);
+    }
 
+    await ensureIndexes();
     bot.use(session());
 
-    // Global error handler  prevents unhandled rejections from crashing the process
+    // Middleware: rate limit + session ensure + user upsert
+    bot.use(async (ctx, next) => {
+        const uid = ctx.from?.id;
+        if (uid && !isAdmin(uid) && !checkRateLimit(uid)) {
+            return ctx.reply("⚠️ Too fast! Please wait ~1 min.").catch(() => { });
+        }
+        ensureSession(ctx);
+        if (ctx.from) await upsertUser(ctx).catch(e => console.error("upsertUser error:", e.message));
+        await next();
+    });
+
+    // Global error handler
     bot.catch((err, ctx) => {
         console.error(`[${ctx?.updateType}] Global error:`, err.message);
         ctx?.reply?.(formatError(err), { parse_mode: "HTML" }).catch(() => { });
     });
 
-    // ======================================================
-    // /start
-    // ======================================================
-
+    // ========== /start ==========
     bot.start(async (ctx) => {
-        try {
-            const rawText = ctx.message?.text || "";
-            const startParam = (ctx.startPayload ?? rawText.split(" ")[1] ?? "").trim();
+        const uid = await upsertUser(ctx);
+        const stats = await getUserStats(uid);
+        const text = `
+<b>☁️ Cloud Bot v${version}</b>
 
-            const userId = await upsertUser(ctx, startParam || null);
+<b>Features:</b>
+• 📤 Auto-save any file
+• 📁 Folder organization
+• 🔍 Inline search anywhere
+• 🔗 Share with users
+• ⏰ Auto-expiry dates
+• 🔐 Private files
+• 📊 Usage stats
 
-            let user = await UserModel.findOne({ tgUserId: userId }).lean();
-            if (!user) throw new Error("User not found after upsert");
+<b>Your Storage:</b>
+• Files: <code>${stats?.totalFiles || 0}</code>
+• Used: <code>${formatFileSize(stats?.totalSize || 0)}</code>
 
-            // Edge case: very old records that were created before refCode was added
-            if (!user.refCode) {
-                const newCode = await generateReferralCode(userId, user.firstName || ctx.from?.first_name || "");
-                await UserModel.updateOne({ tgUserId: userId }, { $set: { refCode: newCode } });
-                user = { ...user, refCode: newCode };
-            }
-
-            const referralLink = `${user.refCode}`;
-
-            let welcomeText = `
-<b>👋 Welcome to Cloud Bot!</b>
-
-I can help you store and manage your files securely in the cloud.
-
-<b>📱 Features:</b>
-• Send any file  it gets saved instantly
-• Manage files via the Web App
-• Edit file names and notes
-• Download your files anytime, anywhere
-`.trim();
-
-            if (startParam) {
-                const referrer = await UserModel.findOne(
-                    { refCode: startParam },
-                    { username: 1, firstName: 1 }
-                ).lean();
-
-                if (referrer) {
-                    const inviter = referrer.username
-                        ? `@${escapeHtml(referrer.username)}`
-                        : escapeHtml(referrer.firstName || "a user");
-                    welcomeText += `\n\n🎉 <b>You were invited by ${inviter}!</b>\nYou both earn bonus points!`;
-                }
-            }
-
-            welcomeText += `\n\n<b>🪪 Your login id:</b>\n<code>${referralLink}</code>`;
-
-            await ctx.replyWithHTML(welcomeText, mainMenu());
-        } catch (err) {
-            console.error("/start error:", err.message);
-            await ctx.reply(formatError(err), { parse_mode: "HTML" });
-        }
+👇 <b>Tap a button:</b>`.trim();
+        await ctx.replyWithHTML(text, KB.main(uid));
     });
 
-    // ======================================================
-    // Text menu command
-    // ======================================================
+    // ========== /help ==========
+    bot.command("help", async (ctx) => {
+        const me = ctx.me || (await bot.telegram.getMe()).username;
+        await ctx.replyWithHTML(`
+<b>🆘 Quick Guide</b>
 
-    bot.hears(/^(menu|home|main)$/i, async (ctx) => {
-        try {
-            await upsertUser(ctx);
-            await ctx.replyWithHTML(`<b>📋 Main Menu</b>\n\nChoose an option:`, mainMenu());
-        } catch (err) {
-            console.error("menu command error:", err.message);
-            await ctx.reply(formatError(err), { parse_mode: "HTML" });
-        }
+<b>Save:</b> Send any file → auto-saved
+<b>Find:</b> Use 🔍 Search or @${me} in any chat
+<b>Organize:</b> Folders → Create/Move files
+<b>Share:</b> Select file → Share → @username
+<b>Expiry:</b> Set 24h/7d/30d/90d auto-delete
+<b>Private:</b> Toggle 🔒 for extra security
+
+<b>Limits:</b> 50MB docs/video/audio, 10MB photos
+<b>Tip:</b> Use descriptive names for better search!
+        `.trim(), KB.main(ctx.from.id));
     });
 
-    // ======================================================
-    // REFERRALS
-    // ======================================================
+    // ========== INLINE — REGISTER HANDLER ==========
+    // ✅ FIX: Ensure this is registered BEFORE text handlers to avoid conflicts
+    bot.on('inline_query', handleInline);
 
-    bot.action("REFERRALS", async (ctx) => {
+    // ========== MAIN NAVIGATION ==========
+    bot.action("MAIN", async (ctx) => {
         await ctx.answerCbQuery();
-        await withLoading(ctx, async () => {
-            const userId = String(ctx.from.id);
-
-            const [user, stats, rank] = await Promise.all([
-                UserModel.findOne({ tgUserId: userId }, { refCode: 1 }).lean(),
-                getUserStats(userId),
-                getUserRank(userId)
-            ]);
-
-            if (!user?.refCode || !stats || !rank) throw new Error("User data not found");
-
-            const botUsername = ctx.botInfo?.username;
-            const referralLink = `https://t.me/${botUsername}?start=${user.refCode}`;
-
-            const text = `
-<b>👥 Referral Program</b>
-
-<b>🔗 Your referral link:</b>
-<code>${referralLink}</code>
-
-<b>📊 Your Stats:</b>
-• Total referrals: <b>${stats.totalReferrals}</b>
-• This week: <b>${stats.weeklyReferrals}</b>
-• This month: <b>${stats.monthlyReferrals}</b>
-
-<b>💎 Your Diamonds:</b> <b>${stats.diamonds}</b> 💎
-
-<b>🏆 Your Rank:</b>
-• Weekly: #${rank.weekly} of ${rank.totalUsers}
-• Monthly: #${rank.monthly} of ${rank.totalUsers}
-
-<b>🎁 Weekly Rewards:</b>
-• 🥇 1st  1000 💎 | 🥈 2nd  500 💎 | 🥉 3rd  250 💎
-• Top 5  100 💎 | Top 10  50 💎
-
-<b>📢 Share your link and start earning!</b>
-      `.trim();
-
-            await safeEditMessage(ctx, text, referralMenu());
-        });
-    });
-
-    bot.action("REFERRAL_STATS", async (ctx) => {
-        await ctx.answerCbQuery();
-        await withLoading(ctx, async () => {
-            const userId = String(ctx.from.id);
-            const stats = await getUserStats(userId);
-            if (!stats) throw new Error("User stats not found");
-
-            const text = `
-<b>📊 Detailed Statistics</b>
-
-<b>📁 Files:</b>
-• Total: <b>${stats.totalFiles}</b>
-• This week: <b>${stats.weeklyFiles}</b> (+${stats.weeklyFiles * 10} pts)
-• This month: <b>${stats.monthlyFiles}</b> (+${stats.monthlyFiles * 10} pts)
-
-<b>👥 Referrals:</b>
-• Total: <b>${stats.totalReferrals}</b>
-• This week: <b>${stats.weeklyReferrals}</b> (+${stats.weeklyReferrals * 50} pts)
-• This month: <b>${stats.monthlyReferrals}</b> (+${stats.monthlyReferrals * 50} pts)
-
-<b>⚡️ Score:</b>
-• Weekly: <b>${stats.weekScore} pts</b>
-• Monthly: <b>${stats.monthScore} pts</b>
-
-<b>💎 Diamond Balance:</b> <b>${stats.diamonds}</b> 💎
-      `.trim();
-
-            await safeEditMessage(ctx, text, referralMenu());
-        });
-    });
-
-    // ======================================================
-    // LEADERBOARD
-    // ======================================================
-
-    bot.action("LEADERBOARD", async (ctx) => {
-        await ctx.answerCbQuery();
-        await safeEditMessage(ctx, `<b>🏆 Leaderboard</b>\n\nChoose a type:`, leaderboardMenu());
-    });
-
-    bot.action("WEEKLY_LEADERBOARD", async (ctx) => {
-        await ctx.answerCbQuery();
-        await withLoading(ctx, async () => {
-            const leaderboard = await calculateWeeklyLeaderboard(10);
-            const text = `
-<b>📅 Weekly Leaderboard</b>
-
-${formatLeaderboard(leaderboard, "weekly")}
-
-<b>⚡️ Scoring:</b>
-• File upload: +10 pts
-• Referral: +50 pts
-
-<i>⏰ Resets every Monday</i>
-      `.trim();
-            await safeEditMessage(ctx, text, leaderboardMenu());
-        });
-    });
-
-    bot.action("MONTHLY_LEADERBOARD", async (ctx) => {
-        await ctx.answerCbQuery();
-        await withLoading(ctx, async () => {
-            const leaderboard = await calculateMonthlyLeaderboard(10);
-            const text = `
-<b>📆 Monthly Leaderboard</b>
-
-${formatLeaderboard(leaderboard, "monthly")}
-
-<b>⚡️ Scoring:</b>
-• File upload: +10 pts
-• Referral: +50 pts
-
-<i>⏰ Resets on the 1st of each month</i>
-      `.trim();
-            await safeEditMessage(ctx, text, leaderboardMenu());
-        });
-    });
-
-    bot.action("MY_RANK", async (ctx) => {
-        await ctx.answerCbQuery();
-        await withLoading(ctx, async () => {
-            const userId = String(ctx.from.id);
-            const [rank, stats] = await Promise.all([getUserRank(userId), getUserStats(userId)]);
-            if (!rank || !stats) throw new Error("User data not found");
-
-            const text = `
-<b>👤 Your Rankings</b>
-
-<b>📅 Weekly:</b>
-• Rank: <b>#${rank.weekly}</b> of ${rank.totalUsers}
-• Score: <b>${stats.weekScore} pts</b>
-
-<b>📆 Monthly:</b>
-• Rank: <b>#${rank.monthly}</b> of ${rank.totalUsers}
-• Score: <b>${stats.monthScore} pts</b>
-
-<b>💎 Diamonds:</b> <b>${stats.diamonds}</b> 💎
-
-<b>📊 How to climb:</b>
-• Upload files (+10 pts each)
-• Invite friends (+50 pts each)
-      `.trim();
-
-            await safeEditMessage(ctx, text, leaderboardMenu());
-        });
-    });
-
-    // ======================================================
-    // CLAIM REWARDS
-    // ======================================================
-
-    bot.action("CLAIM_REWARDS", async (ctx) => {
-        await ctx.answerCbQuery();
-        await withLoading(ctx, async () => {
-            const userId = String(ctx.from.id);
-            const user = await UserModel.findOne({ tgUserId: userId }).lean();
-            if (!user) throw new Error("User not found");
-
-            const now = Date.now();
-            const weekMs = 7 * 24 * 60 * 60 * 1000;
-
-            if (user.refAwardedAt && user.refAwardedAt.getTime() > now - weekMs) {
-                const nextClaim = user.refAwardedAt.getTime() + weekMs;
-                const daysLeft = Math.ceil((nextClaim - now) / (24 * 60 * 60 * 1000));
-                throw new Error(`You already claimed rewards this week. Next claim in ${daysLeft} day(s).`);
-            }
-
-            const weekly = await calculateWeeklyLeaderboard(10);
-            const idx = weekly.findIndex(u => u.tgUserId === userId);
-            const rewardRow = idx >= 0 ? REWARD_TABLE[idx] : null;
-
-            if (rewardRow) {
-                await UserModel.updateOne(
-                    { tgUserId: userId },
-                    { $inc: { diamonds: rewardRow.diamonds }, $set: { refAwardedAt: new Date() } }
-                );
-                invalidateUserCache(userId);
-                memoryCache.delPattern("leaderboard:*");
-
-                await safeEditMessage(ctx, `
-<b>🎁 Reward Claimed!</b>
-
-${rewardRow.badge} ${rewardRow.title}  <b>+${rewardRow.diamonds} 💎</b>
-
-<b>New balance:</b> ${(user.diamonds || 0) + rewardRow.diamonds} 💎
-
-Keep it up to earn more next week!
-        `.trim(), referralMenu());
-            } else {
-                await safeEditMessage(ctx, `
-<b>⚠️ No Reward Available</b>
-
-You are not in the Top 10 this week.
-
-Upload more files and invite friends to climb the leaderboard!
-        `.trim(), referralMenu());
-            }
-        });
-    });
-
-    // ======================================================
-    // INFO PAGES
-    // ======================================================
-
-    bot.action("ABOUT", async (ctx) => {
-        await ctx.answerCbQuery();
-        await safeEditMessage(ctx, `
-<b>ℹ️ About Cloud Bot</b>
-
-<b>Version:</b> ${version}
-<b>Platform:</b> Telegram Web App
-
-<b>✨ Features:</b>
-• Web interface for file management
-• Edit file names &amp; notes
-• Download files anytime
-• Dark / Light theme support
-• File type icons &amp; download progress
-
-<b>🔒 Privacy:</b>
-• Files stored on Telegram servers
-• Only you can access your files
-• No third-party access
-    `.trim(), mainMenu(true));
-    });
-
-    bot.action("HELP", async (ctx) => {
-        await ctx.answerCbQuery();
-        await safeEditMessage(ctx, `
-<b>🆘 Help &amp; Support</b>
-
-<b>How do I save files?</b>
-Just send any file to the bot  it's saved automatically.
-
-<b>What are the size limits?</b>
-• Documents / Video / Audio / Voice: 50 MB
-• Photos: 10 MB
-
-<b>How do I earn points?</b>
-• Upload a file →  +10 pts
-• Invite a friend →  +50 pts
-
-<b>How do I invite friends?</b>
-Go to <b>Referrals</b> and share your personal link.
-
-<b>When are rewards given?</b>
-Weekly (every Monday) and monthly (1st of each month).
-
-<b>Are my files private?</b>
-Yes  stored on Telegram servers, accessible only by you.
-    `.trim(), mainMenu(true));
+        await safeEdit(ctx, "<b>📋 Main Menu</b>", KB.main(ctx.from.id));
     });
 
     bot.action("MY_FILES", async (ctx) => {
         await ctx.answerCbQuery();
         await withLoading(ctx, async () => {
-            const userId = await upsertUser(ctx);
+            const uid = String(ctx.from.id);
+            const stats = await getUserStats(uid);
 
-            const [totalFiles, sizeResult, kindStats] = await Promise.all([
-                FileModel.countDocuments({ ownerTgUserId: userId }),
-                FileModel.aggregate([
-                    { $match: { ownerTgUserId: userId } },
-                    { $group: { _id: null, total: { $sum: "$fileSize" } } }
-                ]),
-                FileModel.aggregate([
-                    { $match: { ownerTgUserId: userId } },
-                    { $group: { _id: "$kind", count: { $sum: 1 } } },
-                    { $sort: { count: -1 } }
-                ])
-            ]);
-
-            const size = sizeResult[0]?.total || 0;
-            const kindText = kindStats.length
-                ? kindStats.map(s => `• ${s._id}: ${s.count}`).join("\n")
-                : "• No files yet";
-
-            await safeEditMessage(ctx, `
-<b>📊 Your File Statistics</b>
-
-<b>Total files:</b> <code>${totalFiles}</code>
-<b>Total size:</b>  <code>${formatFileSize(size)}</code>
-
-<b>📁 By type:</b>
-${kindText}
-      `.trim(), mainMenu(true));
-        });
-    });
-
-    bot.action("LIMITS", async (ctx) => {
-        await ctx.answerCbQuery();
-        await safeEditMessage(ctx, `
-<b>📈 File Size Limits</b>
-
-📄 <b>Documents</b>  max <code>50 MB</code>
-🖼 <b>Photos</b>  max <code>10 MB</code>
-🎥 <b>Videos</b>  max <code>50 MB</code>
-🎵 <b>Audio</b>  max <code>50 MB</code>
-🎤 <b>Voice</b>  max <code>50 MB</code>
-
-<b>⚠️ Tips:</b>
-• Split large files before uploading
-• Compress when possible
-• Use the Web App for the best experience
-    `.trim(), mainMenu(true));
-    });
-
-    bot.action("MAIN_MENU", async (ctx) => {
-        await ctx.answerCbQuery();
-        await safeEditMessage(ctx, `<b>📋 Main Menu</b>`, mainMenu());
-    });
-
-    // ======================================================
-    // ADMIN PANEL
-    // ======================================================
-
-    bot.command("admin", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return;
-        await ctx.replyWithHTML(
-            `<b>👑 Admin Panel</b>\n\nWelcome! Choose an action:`,
-            adminMenu()
-        );
-    });
-
-    bot.action("ADMIN_STATS", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("Access denied", { show_alert: true });
-        await ctx.answerCbQuery();
-        await withLoading(ctx, async () => {
-            const cacheKey = "admin:stats";
-            const cached = memoryCache.get(cacheKey);
-            if (cached) return safeEditMessage(ctx, cached, adminMenu());
-
-            const [totalUsers, activeToday, totalFiles, sizeResult, refResult] = await Promise.all([
-                UserModel.estimatedDocumentCount(),
-                UserModel.countDocuments({ lastActiveAt: { $gte: new Date(Date.now() - 86_400_000) } }),
-                FileModel.estimatedDocumentCount(),
-                FileModel.aggregate([{ $group: { _id: null, total: { $sum: "$fileSize" } } }]),
-                UserModel.aggregate([{ $group: { _id: null, total: { $sum: "$refCount" } } }])
-            ]);
-
-            const size = sizeResult[0]?.total || 0;
-            const refs = refResult[0]?.total || 0;
-
-            const text = `
-<b>📊 Admin Statistics</b>
-
-<b>👥 Users:</b>
-• Total: <code>${totalUsers}</code>
-• Active today: <code>${activeToday}</code>
-
-<b>📁 Files:</b>
-• Total: <code>${totalFiles}</code>
-• Total size: <code>${formatFileSize(size)}</code>
-• Avg per user: <code>${totalUsers ? (totalFiles / totalUsers).toFixed(1) : 0}</code>
-
-<b>🤝 Referrals:</b>
-• Total: <code>${refs}</code>
-• Avg per user: <code>${totalUsers ? (refs / totalUsers).toFixed(1) : 0}</code>
-      `.trim();
-
-            memoryCache.set(cacheKey, text, CACHE_TTL.ADMIN);
-            await safeEditMessage(ctx, text, adminMenu());
-        });
-    });
-
-    bot.action("ADMIN_GIVE_REWARDS", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("Access denied", { show_alert: true });
-        await ctx.answerCbQuery();
-        await withLoading(ctx, async () => {
-            const results = await calculateWeeklyRewards();
-            if (results.length === 0) throw new Error("No eligible users to reward");
-
-            let text = "<b>🎁 Weekly Rewards Distributed!</b>\n\n";
-            for (const { user, reward } of results) {
-                const name = escapeHtml(user.firstName || user.username || "User");
-                text += `${reward.badge} <b>${name}</b>: +${reward.diamonds} 💎 (${reward.title})\n`;
+            if (!stats || stats.totalFiles === 0) {
+                return safeEdit(ctx, "📭 <b>No files yet</b>\n\nSend any file to save it!\n\n💡 Forward from other chats too.", KB.main(uid));
             }
 
-            await safeEditMessage(ctx, text, adminMenu());
+            const list = stats.recent.map(f =>
+                `• <code>${escapeHtml(f.fileName)}</code>\n  ${f.kind.toUpperCase()} • ${formatFileSize(f.fileSize)} • ${formatTime(f.createdAt)}${f.isPrivate ? ' 🔒' : ''}`
+            ).join('\n');
+
+            await safeEdit(ctx, `<b>📁 Recent Files</b> (${stats.totalFiles} total)\n\n${list}\n\n<b>💾 Used:</b> <code>${formatFileSize(stats.totalSize)}</code>\n\n👇 Actions:`, KB.main(uid));
         });
     });
 
-    bot.action("ADMIN_BROADCAST", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("Access denied", { show_alert: true });
+    // ========== SEARCH ==========
+    bot.action("SEARCH_MAIN", async (ctx) => {
         await ctx.answerCbQuery();
+        const sess = ensureSession(ctx);
+        sess.searchMode = true;
+        sess.searchFilter = null;
+        await safeEdit(ctx, "🔍 <b>Search Files</b>\n\n• Type keyword below\n• Or use inline: @bot query\n\n<b>Filter by type:</b>", KB.search());
+    });
 
-        ctx.session = ctx.session || {};
-        ctx.session.broadcast = true;
+    bot.action(/^SRCH:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        const filter = ctx.match[1];
+        const sess = ensureSession(ctx);
+        if (filter === "CLEAR") {
+            sess.searchFilter = null;
+            sess.searchMode = false;
+            return safeEdit(ctx, "🔍 <b>Search Files</b>\n\n• Type keyword below\n• Or use inline: @bot query\n\n<b>Filter by type:</b>", KB.search());
+        }
+        sess.searchFilter = filter;
+        sess.searchMode = true;
+        await ctx.reply(`🔍 Filter set: <b>${filter}</b>\n\nNow type your search keyword:`, { parse_mode: "HTML" });
+    });
 
-        await safeEditMessage(ctx, `
-<b>📢 Broadcast Message</b>
+    // ========== FOLDERS ==========
+    bot.action("FOLDERS_MAIN", async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const user = await UserModel.findOne({ tgUserId: uid }, { folderIds: 1 }).lean();
+        const folders = user?.folderIds || [];
+        const list = folders.length
+            ? folders.map(f => `📁 <b>${escapeHtml(f.name)}</b> (${f.fileCount} files)`).join('\n')
+            : "No folders yet. Create one!";
+        await safeEdit(ctx, `<b>📂 Your Folders</b>\n\n${list}\n\n👇 Manage:`, KB.folders());
+    });
 
-Type the message you want to send to all users.
-HTML formatting is supported.
+    bot.action("FOLDER_CREATE", async (ctx) => {
+        await ctx.answerCbQuery();
+        ensureSession(ctx).pendingAction = { type: "folder_create" };
+        await ctx.editMessageText("📁 <b>New Folder</b>\n\nSend folder name:", {
+            parse_mode: "HTML",
+            reply_markup: Markup.inlineKeyboard([[Markup.button.callback("❌ Cancel", "CANCEL_ACTION")]]).reply_markup
+        });
+    });
 
-Send /cancel to abort.
-    `.trim(), Markup.inlineKeyboard([
-            [Markup.button.callback("❌ Cancel", "CANCEL_BROADCAST")]
+    bot.action("FOLDER_LIST", async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const user = await UserModel.findOne({ tgUserId: uid }, { folderIds: 1 }).lean();
+        if (!user?.folderIds?.length) return ctx.answerCbQuery("No folders yet", { show_alert: true });
+
+        const kb = Markup.inlineKeyboard([
+            ...user.folderIds.slice(0, 10).map(f => [Markup.button.callback(`📁 ${f.name}`, `FOLDER_OPEN:${f._id}`)]),
+            [Markup.button.callback("🔙 Back", "FOLDERS_MAIN")]
+        ]);
+        await ctx.editMessageText("<b>📂 Select Folder:</b>", { parse_mode: "HTML", reply_markup: kb.reply_markup });
+    });
+
+    bot.action(/^FOLDER_OPEN:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const fid = ctx.match[1];
+        const files = await FileModel.find({ ownerTgUserId: uid, folderId: fid, isDeleted: { $ne: true } })
+            .sort({ createdAt: -1 }).limit(10).lean();
+
+        if (!files.length) return ctx.editMessageText("📭 Empty folder", { reply_markup: KB.folders().reply_markup });
+
+        const list = files.map(f =>
+            `• <code>${escapeHtml(f.fileName)}</code>\n  ${formatFileSize(f.fileSize)} • ${formatTime(f.createdAt)}`
+        ).join('\n');
+        await ctx.editMessageText(`<b>📁 Folder Contents</b>\n\n${list}`, {
+            parse_mode: "HTML",
+            reply_markup: KB.folders().reply_markup
+        });
+    });
+
+    bot.action("FOLDER_MOVE_SELECT", async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const files = await FileModel.find({ ownerTgUserId: uid, folderId: null, isDeleted: { $ne: true } })
+            .limit(10).select('_id fileName').lean();
+        if (!files.length) return ctx.answerCbQuery("No files to move", { show_alert: true });
+
+        const kb = Markup.inlineKeyboard([
+            ...files.slice(0, 8).map(f => [Markup.button.callback(`📄 ${f.fileName.slice(0, 30)}`, `MOVE_SELECT:${f._id}`)]),
+            [Markup.button.callback("🔙 Back", "FOLDERS_MAIN")]
+        ]);
+        await ctx.editMessageText("<b>🗂️ Select file to move:</b>", { parse_mode: "HTML", reply_markup: kb.reply_markup });
+    });
+
+    bot.action(/^MOVE_SELECT:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const fid = ctx.match[1];
+        const user = await UserModel.findOne({ tgUserId: uid }, { folderIds: 1 }).lean();
+        if (!user?.folderIds?.length) return ctx.answerCbQuery("Create a folder first", { show_alert: true });
+
+        const kb = Markup.inlineKeyboard([
+            ...user.folderIds.map(f => [Markup.button.callback(`📁 ${f.name}`, `MOVE_EXEC:${fid}:${f._id}`)]),
+            [Markup.button.callback("🏠 Root (no folder)", `MOVE_EXEC:${fid}:null`)],
+            [Markup.button.callback("❌ Cancel", "CANCEL_ACTION")]
+        ]);
+        await ctx.editMessageText("<b>📂 Move to:</b>", { parse_mode: "HTML", reply_markup: kb.reply_markup });
+    });
+
+    bot.action(/^MOVE_EXEC:([^:]+):(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery("🔄 Moving...");
+        const uid = String(ctx.from.id);
+        const fileId = ctx.match[1];
+        const folderId = ctx.match[2] === 'null' ? null : ctx.match[2];
+        await moveFiles(uid, [fileId], folderId);
+        await ctx.editMessageText("✅ Moved!", { reply_markup: KB.folders().reply_markup });
+    });
+
+    // ========== EXPIRING ==========
+    bot.action("EXPIRING_MAIN", async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const exp = await FileModel.find({
+            ownerTgUserId: uid,
+            expiresAt: { $gt: new Date() },
+            isDeleted: { $ne: true }
+        }).sort({ expiresAt: 1 }).limit(10).select('fileName expiresAt').lean();
+
+        const text = exp.length
+            ? `⏰ <b>Expiring Soon</b>\n\n` + exp.map(f =>
+                `• <code>${escapeHtml(f.fileName)}</code>\n  📅 ${new Date(f.expiresAt).toLocaleString()}`
+            ).join('\n')
+            : "✅ <b>No expiring files</b>\n\nSet expiry on files to auto-delete.";
+
+        await safeEdit(ctx, text, KB.main(uid));
+    });
+
+    // ========== SHARE ==========
+    bot.action("SHARE_MAIN", async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+
+        const appUrl2 = webAppUrl();
+        await safeEdit(ctx, "🔗 <b>Share File</b>\n\n1. Select a file below\n2. Enter @username to share with" + (appUrl2 ? "\n\nOr use Web App:" : ""), Markup.inlineKeyboard([
+            ...(appUrl2 ? [[Markup.button.webApp("🌐 Web App", appUrl2)]] : []),
+            [Markup.button.callback("🔙 Back", "MAIN")]
         ]));
+
+        const files = await FileModel.find({ ownerTgUserId: uid, isDeleted: { $ne: true } })
+            .limit(10).select('_id fileName').lean();
+        if (!files.length) return;
+
+        const kb = Markup.inlineKeyboard([
+            ...files.map(f => [Markup.button.callback(`📄 ${f.fileName.slice(0, 35)}`, `SHARE_SELECT:${f._id}`)]),
+            [Markup.button.callback("❌ Cancel", "CANCEL_ACTION")]
+        ]);
+        await ctx.reply("<b>Select file to share:</b>", { parse_mode: "HTML", reply_markup: kb.reply_markup });
     });
 
-    bot.action("CANCEL_BROADCAST", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return;
-        await ctx.answerCbQuery("Broadcast cancelled");
-        ctx.session = ctx.session || {};
-        ctx.session.broadcast = false;
-        await safeEditMessage(ctx, `<b>📋 Main Menu</b>`, mainMenu());
+    bot.action(/^SHARE_SELECT:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        ensureSession(ctx).pendingAction = { type: "share", fileId: ctx.match[1] };
+        await ctx.editMessageText("🔗 <b>Share With:</b>\n\nEnter @username:", {
+            parse_mode: "HTML",
+            reply_markup: Markup.inlineKeyboard([[Markup.button.callback("❌ Cancel", "CANCEL_ACTION")]]).reply_markup
+        });
     });
 
-    // ======================================================
-    // TEXT HANDLER
-    // ======================================================
+    // ========== SETTINGS ==========
+    bot.action("SETTINGS_MAIN", async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const user = await UserModel.findOne({ tgUserId: uid }, { settings: 1 }).lean();
+        await safeEdit(ctx, "⚙️ <b>Settings</b>", KB.settings(user));
+    });
 
-    bot.on("text", async (ctx) => {
+    bot.action(/^SET:NOTIF:(on|off)$/, async (ctx) => {
+        const newVal = ctx.match[1] === "on";
+        const uid = String(ctx.from.id);
+        await UserModel.updateOne({ tgUserId: uid }, { $set: { "settings.notifications": newVal } });
+        invalidateUser(uid);
+        await ctx.answerCbQuery(`🔔 Notifications ${newVal ? "ON" : "OFF"}`, { show_alert: true });
+        const user = await UserModel.findOne({ tgUserId: uid }, { settings: 1 }).lean();
+        await ctx.editMessageText("⚙️ <b>Settings</b>", {
+            parse_mode: "HTML",
+            reply_markup: KB.settings(user).reply_markup
+        });
+    });
+
+    bot.action("SET:PRIV:toggle", async (ctx) => {
+        const uid = String(ctx.from.id);
+        const user = await UserModel.findOne({ tgUserId: uid }, { settings: 1 }).lean();
+        const newVal = !user?.settings?.privateByDefault;
+        await UserModel.updateOne({ tgUserId: uid }, { $set: { "settings.privateByDefault": newVal } });
+        invalidateUser(uid);
+        await ctx.answerCbQuery(`🔐 Private default: ${newVal ? 'ON' : 'OFF'}`, { show_alert: true });
+        const updated = await UserModel.findOne({ tgUserId: uid }, { settings: 1 }).lean();
+        await ctx.editMessageText("⚙️ <b>Settings</b>", {
+            parse_mode: "HTML",
+            reply_markup: KB.settings(updated).reply_markup
+        });
+    });
+
+    bot.action("SET:EXPIRE:menu", async (ctx) => {
+        await ctx.answerCbQuery();
+        await ctx.editMessageText("⏰ <b>Auto-Expire Default</b>\n\nNew files will auto-delete after:", {
+            parse_mode: "HTML",
+            reply_markup: KB.expireMenu().reply_markup
+        });
+    });
+
+    bot.action(/^EXPSET:(.+)$/, async (ctx) => {
+        const dur = ctx.match[1];
+        const uid = String(ctx.from.id);
+        await UserModel.updateOne({ tgUserId: uid }, { $set: { "settings.autoExpire": dur === 'none' ? null : dur } });
+        invalidateUser(uid);
+        await ctx.answerCbQuery(`✅ Auto-expire: ${dur === 'none' ? 'disabled' : dur}`, { show_alert: true });
+        const user = await UserModel.findOne({ tgUserId: uid }, { settings: 1 }).lean();
+        await ctx.editMessageText("⚙️ <b>Settings</b>", {
+            parse_mode: "HTML",
+            reply_markup: KB.settings(user).reply_markup
+        });
+    });
+
+    bot.action("SET:CACHE", async (ctx) => {
+        const uid = String(ctx.from.id);
+        invalidateUser(uid);
+        await ctx.answerCbQuery("✅ Your cache cleared!", { show_alert: true });
+    });
+
+    bot.action("SET:STATS", async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const stats = await getUserStats(uid);
+        if (!stats) return ctx.answerCbQuery("Error loading stats", { show_alert: true });
+
+        const kindText = stats.byKind.map(k =>
+            `• ${k._id}: ${k.count} file(s) • ${formatFileSize(k.size)}`
+        ).join('\n') || "• No files yet";
+
+        await ctx.replyWithHTML(`
+<b>📊 Your Stats</b>
+
+<b>Files:</b> ${stats.totalFiles}
+<b>Storage:</b> ${formatFileSize(stats.totalSize)}
+
+<b>By Type:</b>
+${kindText}
+
+<b>Recent:</b>
+${stats.recent.slice(0, 3).map(f => `• <code>${escapeHtml(f.fileName)}</code> • ${formatFileSize(f.fileSize)}`).join('\n') || "• None"}
+        `.trim(), KB.main(uid));
+    });
+
+    // ========== FILE ACTIONS ==========
+    bot.action(/^DL:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery("📥 Sending...");
+        const uid = String(ctx.from.id);
+        const file = await FileModel.findOne({ _id: ctx.match[1], ownerTgUserId: uid }).lean();
+        if (!file) return ctx.reply("❌ File not found or access denied.");
         try {
-            const userId = String(ctx.from?.id || "");
-            const msgText = ctx.message?.text || "";
-
-            // ── Admin broadcast flow ──────────────────────────────
-            if (isAdmin(userId) && ctx.session?.broadcast) {
-                ctx.session.broadcast = false;
-
-                if (msgText === "/cancel") {
-                    return ctx.replyWithHTML("✅ Broadcast cancelled.", mainMenu());
-                }
-
-                const loadingMsg = await ctx.replyWithHTML("📤 Starting broadcast…");
-                const pageSize = 100;
-                let page = 0, sent = 0, failed = 0, blocked = 0;
-
-                while (true) {
-                    const users = await UserModel.find(
-                        { isBlocked: { $ne: true } },
-                        { tgUserId: 1 }
-                    ).skip(page * pageSize).limit(pageSize).lean();
-
-                    if (users.length === 0) break;
-
-                    for (const u of users) {
-                        try {
-                            await ctx.telegram.sendMessage(u.tgUserId, msgText, { parse_mode: "HTML" });
-                            sent++;
-                        } catch (err) {
-                            if (err?.code === 403) {
-                                // User blocked the bot  mark and skip
-                                UserModel.updateOne({ tgUserId: u.tgUserId }, { $set: { isBlocked: true } }).catch(() => { });
-                                blocked++;
-                            } else {
-                                failed++;
-                            }
-                        }
-                        await sleep(50); // ~20 msg/s  within Telegram rate limits
-                    }
-
-                    page++;
-
-                    // Update progress every 5 pages (~500 users)
-                    if (page % 5 === 0) {
-                        ctx.telegram.editMessageText(
-                            ctx.chat.id, loadingMsg.message_id, undefined,
-                            `📤 Sending… ✅ ${sent} | ❌ ${failed} | 🚫 ${blocked}`,
-                            { parse_mode: "HTML" }
-                        ).catch(() => { });
-                    }
-                }
-
-                return ctx.telegram.editMessageText(
-                    ctx.chat.id, loadingMsg.message_id, undefined,
-                    `<b>📢 Broadcast Complete</b>\n\n✅ Sent: <code>${sent}</code>\n❌ Failed: <code>${failed}</code>\n🚫 Blocked: <code>${blocked}</code>`,
-                    { parse_mode: "HTML" }
-                ).catch(() => { });
+            if (file.kind === 'photo') {
+                await ctx.replyWithPhoto(file.tgFileId, {
+                    caption: `<b>${escapeHtml(file.fileName)}</b>`,
+                    parse_mode: "HTML"
+                });
+            } else {
+                await ctx.replyWithDocument(file.tgFileId, {
+                    caption: `<b>${escapeHtml(file.fileName)}</b>`,
+                    parse_mode: "HTML"
+                });
             }
-
-            // ── Regular users ─────────────────────────────────────
-            await ctx.replyWithHTML("Please use the menu buttons below:", mainMenu());
-        } catch (err) {
-            console.error("text handler error:", err.message);
-            await ctx.reply(formatError(err), { parse_mode: "HTML" });
+        } catch (e) {
+            console.error("Download error:", e.message);
+            await ctx.reply("❌ Could not send file. It may have been deleted from Telegram.");
         }
     });
 
-    // ======================================================
-    // FILE HANDLER
-    // ======================================================
+    bot.action(/^RENAME:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        ensureSession(ctx).pendingAction = { type: "rename", fileId: ctx.match[1] };
+        await ctx.editMessageText("✏️ <b>Rename File</b>\n\nSend the new name:", {
+            parse_mode: "HTML",
+            reply_markup: Markup.inlineKeyboard([[Markup.button.callback("❌ Cancel", "CANCEL_ACTION")]]).reply_markup
+        });
+    });
 
-    const FILE_LIMITS = {
-        document: 50 * 1024 * 1024,
-        video: 50 * 1024 * 1024,
-        audio: 50 * 1024 * 1024,
-        voice: 50 * 1024 * 1024,
-        photo: 10 * 1024 * 1024
-    };
+    bot.action(/^DELETE:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        const file = await FileModel.findById(ctx.match[1]).lean();
+        await safeEdit(
+            ctx,
+            `🗑️ <b>Delete File?</b>\n\n<code>${escapeHtml(file?.fileName || "Unknown")}</code>\n\n⚠️ Moves to trash (30 days).`,
+            KB.confirm("delete", ctx.match[1])
+        );
+    });
 
-    const DEFAULT_NAMES = {
-        photo: () => `photo_${Date.now()}.jpg`,
-        video: () => `video_${Date.now()}.mp4`,
-        audio: () => `audio_${Date.now()}.mp3`,
-        voice: () => `voice_${Date.now()}.ogg`
-    };
+    bot.action(/^CONFIRM:delete:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery("🗑️ Deleting...");
+        const uid = String(ctx.from.id);
+        const res = await softDelete(uid, ctx.match[1]);
+        if (!res) return ctx.editMessageText("❌ File not found or already deleted.", { reply_markup: KB.main(uid).reply_markup });
+        await ctx.editMessageText("✅ Moved to trash. Will be permanently deleted in 30 days.", {
+            reply_markup: KB.main(uid).reply_markup
+        });
+    });
 
+    bot.action(/^PRIV:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const file = await FileModel.findOne({ _id: ctx.match[1], ownerTgUserId: uid }).lean();
+        if (!file) return ctx.answerCbQuery("File not found", { show_alert: true });
+        await updateFile(uid, ctx.match[1], { isPrivate: !file.isPrivate });
+        await ctx.answerCbQuery(`🔒 Private: ${!file.isPrivate ? 'ON' : 'OFF'}`, { show_alert: true });
+        await ctx.editMessageReplyMarkup(KB.files(ctx.match[1]).reply_markup);
+    });
+
+    bot.action(/^EXP:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        ensureSession(ctx).pendingAction = { type: "set_expiry", fileId: ctx.match[1] };
+        await ctx.editMessageText("⏰ <b>Set File Expiry</b>\n\nChoose duration:", {
+            parse_mode: "HTML",
+            reply_markup: KB.expireMenuForFile().reply_markup
+        });
+    });
+
+    bot.action(/^FILE_EXPSET:(.+)$/, async (ctx) => {
+        const sess = ensureSession(ctx);
+        if (sess.pendingAction?.type !== "set_expiry") {
+            return ctx.answerCbQuery("Session expired. Please try again.", { show_alert: true });
+        }
+        await ctx.answerCbQuery("⏳ Setting...");
+        const dur = ctx.match[1];
+        const fileId = sess.pendingAction.fileId;
+        const uid = String(ctx.from.id);
+        sess.pendingAction = null;
+
+        const res = await setExpiry(uid, fileId, dur);
+        const msg = res
+            ? `✅ Expiry set: ${dur === 'none' ? 'removed' : dur}`
+            : "❌ Failed to set expiry. File not found.";
+        await ctx.editMessageText(msg, { reply_markup: KB.files(fileId).reply_markup });
+    });
+
+    bot.action(/^MOVE:(.+)$/, async (ctx) => {
+        await ctx.answerCbQuery();
+        const uid = String(ctx.from.id);
+        const user = await UserModel.findOne({ tgUserId: uid }, { folderIds: 1 }).lean();
+        if (!user?.folderIds?.length) return ctx.answerCbQuery("Create a folder first!", { show_alert: true });
+
+        const kb = Markup.inlineKeyboard([
+            ...user.folderIds.map(f => [Markup.button.callback(`📁 ${f.name}`, `MOVE_EXEC:${ctx.match[1]}:${f._id}`)]),
+            [Markup.button.callback("🏠 Root", `MOVE_EXEC:${ctx.match[1]}:null`)],
+            [Markup.button.callback("❌ Cancel", "CANCEL_ACTION")]
+        ]);
+        await ctx.editMessageText("<b>📂 Move File To:</b>", { parse_mode: "HTML", reply_markup: kb.reply_markup });
+    });
+
+    // ========== CANCEL ==========
+    bot.action(/^CANCEL:.+$/, async (ctx) => {
+        await ctx.answerCbQuery("Cancelled");
+        const sess = ensureSession(ctx);
+        sess.pendingAction = null;
+        sess.searchMode = false;
+        sess.searchFilter = null;
+        await ctx.editMessageText("📋 <b>Main Menu</b>", {
+            parse_mode: "HTML",
+            reply_markup: KB.main(ctx.from.id).reply_markup
+        });
+    });
+
+    bot.action("CANCEL_ACTION", async (ctx) => {
+        await ctx.answerCbQuery("Cancelled");
+        const sess = ensureSession(ctx);
+        sess.pendingAction = null;
+        sess.searchMode = false;
+        sess.searchFilter = null;
+        await ctx.editMessageText("📋 <b>Main Menu</b>", {
+            parse_mode: "HTML",
+            reply_markup: KB.main(ctx.from.id).reply_markup
+        });
+    });
+
+    // ========== INFO ==========
+    bot.action("ABOUT", async (ctx) => {
+        await ctx.answerCbQuery();
+        await safeEdit(ctx, `
+<b>ℹ️ Cloud Bot v${version}</b>
+
+<b>Features:</b>
+• 🔍 Inline search anywhere
+• 📁 Folder organization  
+• 🔗 Share with @username
+• ⏰ Auto-expiry (24h–90d)
+• 🔐 Private file mode
+• 📊 Usage statistics
+
+<b>Security:</b>
+• Files on Telegram CDN
+• Access control per user
+• Optional auto-delete
+        `.trim(), KB.main(ctx.from.id));
+    });
+
+    bot.action("HELP", async (ctx) => {
+        await ctx.answerCbQuery();
+        const me = ctx.me || (await bot.telegram.getMe()).username;
+        await ctx.replyWithHTML(`
+<b>🆘 Quick Help</b>
+
+<b>❓ FAQ:</b>
+<b>Q:</b> How to save files?
+<b>A:</b> Send any file — auto-saved!
+
+<b>Q:</b> How to find files?
+<b>A:</b> Use 🔍 or @${me} anywhere
+
+<b>Q:</b> Can I share?
+<b>A:</b> Yes! File → Share → @username
+
+<b>Q:</b> Are files private?
+<b>A:</b> Yes by default. Toggle 🔒 for extra.
+
+<b>Q:</b> Size limits?
+<b>A:</b> 50MB docs/video/audio, 10MB photos
+
+<b>💡 Tips:</b>
+• Descriptive names = better search
+• Use folders for projects
+• Set expiry for temp files
+        `.trim(), KB.main(ctx.from.id));
+    });
+
+    // ========== ADMIN PANEL ==========
+    bot.command("admin", async (ctx) => {
+        if (!isAdmin(ctx.from?.id)) return;
+        await ctx.replyWithHTML("<b>👑 Admin Panel</b>", KB.admin());
+    });
+
+    bot.action("ADM:STATS", async (ctx) => {
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("⛔ Access denied", { show_alert: true });
+        await ctx.answerCbQuery();
+
+        try {
+            const [users, active, files, sizeAgg] = await Promise.all([
+                UserModel.estimatedDocumentCount(),
+                UserModel.countDocuments({ lastActiveAt: { $gte: new Date(Date.now() - 86400000) } }),
+                FileModel.estimatedDocumentCount(),
+                FileModel.aggregate([{ $group: { _id: null, total: { $sum: "$fileSize" } } }])
+            ]);
+
+            const text = `
+<b>📊 Admin Stats</b>
+
+<b>👥 Users:</b> ${users} total • ${active} active today
+<b>📁 Files:</b> ${files} • ${formatFileSize(sizeAgg[0]?.total || 0)}
+<b>📈 Avg:</b> ${users ? (files / users).toFixed(1) : 0} files/user
+<b>💾 Cache:</b> ${cache.size} entries
+<b>🔄 Rate limit entries:</b> ${rateLimitMap.size}
+            `.trim();
+
+            await safeEdit(ctx, text, KB.admin());
+        } catch (e) {
+            await ctx.answerCbQuery("DB error: " + e.message, { show_alert: true });
+        }
+    });
+
+    bot.action("ADM:CLEANUP", async (ctx) => {
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("⛔ Access denied", { show_alert: true });
+        await ctx.answerCbQuery("🧹 Cleaning...");
+
+        try {
+            const [expired, cacheCleared] = await Promise.all([
+                FileModel.deleteMany({ expiresAt: { $lt: new Date() }, isDeleted: { $ne: true } }),
+                Promise.resolve().then(() => {
+                    const now = Date.now();
+                    let cleared = 0;
+                    for (const [k, v] of cache) {
+                        if (now > v.expires) { cache.delete(k); cleared++; }
+                    }
+                    return cleared;
+                })
+            ]);
+
+            await safeEdit(ctx, `
+<b>🧹 Cleanup Done</b>
+
+• Expired files deleted: ${expired.deletedCount}
+• Cache entries cleared: ${cacheCleared}
+            `.trim(), KB.admin());
+        } catch (e) {
+            await ctx.reply("❌ Cleanup error: " + e.message);
+        }
+    });
+
+    bot.action("ADM:BROADCAST", async (ctx) => {
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("⛔ Access denied", { show_alert: true });
+        await ctx.answerCbQuery();
+        ensureSession(ctx).broadcast = true;
+        await ctx.editMessageText(
+            "📢 <b>Broadcast</b>\n\nSend your message (HTML supported).\nType /cancel to abort.",
+            {
+                parse_mode: "HTML",
+                reply_markup: Markup.inlineKeyboard([[Markup.button.callback("❌ Cancel", "ADM:CANCEL_BROADCAST")]]).reply_markup
+            }
+        );
+    });
+
+    bot.action("ADM:CANCEL_BROADCAST", async (ctx) => {
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("⛔ Access denied", { show_alert: true });
+        await ctx.answerCbQuery("Cancelled");
+        ensureSession(ctx).broadcast = false;
+        await ctx.editMessageText("<b>👑 Admin Panel</b>", { parse_mode: "HTML", reply_markup: KB.admin().reply_markup });
+    });
+
+    bot.action("ADM:USERS", async (ctx) => {
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("⛔ Access denied", { show_alert: true });
+        await ctx.answerCbQuery();
+
+        try {
+            const [total, active7d, blocked, topUsers] = await Promise.all([
+                UserModel.countDocuments(),
+                UserModel.countDocuments({ lastActiveAt: { $gte: new Date(Date.now() - 7 * 86400000) } }),
+                UserModel.countDocuments({ isBlocked: true }),
+                UserModel.find({}, { firstName: 1, username: 1, fileCount: 1, storageUsed: 1 })
+                    .sort({ fileCount: -1 }).limit(5).lean()
+            ]);
+
+            const topList = topUsers.map(u =>
+                `• ${u.username ? `@${u.username}` : escapeHtml(u.firstName || "Unknown")} — ${u.fileCount} files • ${formatFileSize(u.storageUsed)}`
+            ).join('\n') || "No users";
+
+            await safeEdit(ctx, `
+<b>👥 User Stats</b>
+
+<b>Total:</b> ${total}
+<b>Active (7d):</b> ${active7d}
+<b>Blocked:</b> ${blocked}
+
+<b>Top by files:</b>
+${topList}
+            `.trim(), KB.admin());
+        } catch (e) {
+            await ctx.reply("❌ Error: " + e.message);
+        }
+    });
+
+    bot.action("ADM:CACHE", async (ctx) => {
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery("⛔ Access denied", { show_alert: true });
+        const before = cache.size;
+        memoryCache.clear();
+        rateLimitMap.clear();
+        await ctx.answerCbQuery(`✅ Cleared ${before} cache entries + rate limits`, { show_alert: true });
+        await safeEdit(ctx, "<b>👑 Admin Panel</b>\n\n✅ All cache cleared.", KB.admin());
+    });
+
+    // ========== TEXT HANDLER ==========
+    bot.on("text", async (ctx) => {
+        const sess = ensureSession(ctx);
+        const uid = String(ctx.from.id);
+        const txt = ctx.message.text.trim();
+
+        // --- ADMIN BROADCAST ---
+        if (isAdmin(ctx.from?.id) && sess.broadcast) {
+            sess.broadcast = false;
+            if (txt === "/cancel") {
+                return ctx.replyWithHTML("✅ Broadcast cancelled.", KB.admin());
+            }
+
+            const loading = await ctx.reply("📤 Sending broadcast...");
+            let sent = 0, failed = 0, blocked = 0, page = 0;
+            const limit = 100;
+
+            while (true) {
+                const users = await UserModel.find(
+                    { isBlocked: { $ne: true } },
+                    { tgUserId: 1 }
+                ).skip(page * limit).limit(limit).lean();
+                if (!users.length) break;
+
+                for (const u of users) {
+                    try {
+                        await ctx.telegram.sendMessage(u.tgUserId, txt, { parse_mode: "HTML" });
+                        sent++;
+                    } catch (e) {
+                        if (e?.code === 403) {
+                            UserModel.updateOne({ tgUserId: u.tgUserId }, { $set: { isBlocked: true } }).catch(() => { });
+                            blocked++;
+                        } else {
+                            failed++;
+                        }
+                    }
+                    await sleep(40);
+                }
+                page++;
+
+                if (page % 5 === 0) {
+                    ctx.telegram.editMessageText(
+                        ctx.chat.id, loading.message_id, undefined,
+                        `📤 Progress: ${sent}✅ ${failed}❌ ${blocked}🚫`,
+                        { parse_mode: "HTML" }
+                    ).catch(() => { });
+                }
+            }
+
+            return ctx.telegram.editMessageText(
+                ctx.chat.id, loading.message_id, undefined,
+                `<b>✅ Broadcast Done</b>\n\nSent: ${sent}\nFailed: ${failed}\nBlocked: ${blocked}`,
+                { parse_mode: "HTML" }
+            ).catch(() => { });
+        }
+
+        // --- SEARCH MODE ---
+        if (sess.searchMode && txt && !txt.startsWith('/')) {
+            sess.searchMode = false;
+            const filter = sess.searchFilter;
+            sess.searchFilter = null;
+
+            await ctx.reply(`🔍 Searching: <code>${escapeHtml(txt)}</code>${filter ? ` [${filter}]` : ""}`, { parse_mode: "HTML" });
+            const files = await searchFiles(uid, txt, { kind: filter || undefined, limit: 10 });
+
+            if (!files.length) return ctx.reply("🔍 No results found. Try different keywords.");
+
+            const res = files.map(f =>
+                `📄 <code>${escapeHtml(f.fileName)}</code>\n${f.kind.toUpperCase()} • ${formatFileSize(f.fileSize)} • ${formatTime(f.createdAt)}`
+            ).join('\n\n');
+            return ctx.replyWithHTML(`<b>📋 Results (${files.length}):</b>\n\n${res}`, KB.main(uid));
+        }
+
+        // --- PENDING ACTIONS ---
+        if (sess.pendingAction) {
+            const { type, fileId } = sess.pendingAction;
+            sess.pendingAction = null;
+
+            if (type === "rename" && fileId) {
+                const res = await updateFile(uid, fileId, { fileName: txt.slice(0, 200) });
+                return ctx.replyWithHTML(
+                    res ? `✅ Renamed to: <code>${escapeHtml(txt)}</code>` : "❌ Rename failed. File not found.",
+                    KB.main(uid)
+                );
+            }
+
+            if (type === "folder_create") {
+                if (!txt || txt.length < 1) return ctx.reply("❌ Folder name cannot be empty.");
+                const f = await createFolder(uid, txt);
+                return ctx.replyWithHTML(
+                    f ? `✅ Folder created: <code>${escapeHtml(f.name)}</code>` : "❌ Failed to create folder.",
+                    KB.folders()
+                );
+            }
+
+            if (type === "share" && fileId) {
+                const username = txt.replace('@', '').toLowerCase().trim();
+                if (!username) return ctx.reply("❌ Invalid username. Use @username format.");
+                const target = await UserModel.findOne({ username }).lean();
+                if (!target) return ctx.reply("❌ User not found. They must have started the bot first.");
+                if (target.tgUserId === uid) return ctx.reply("❌ You cannot share a file with yourself.");
+
+                const sharedFile = await FileModel.findOneAndUpdate(
+                    { _id: fileId, ownerTgUserId: uid },
+                    { $addToSet: { sharedWith: target.tgUserId } },
+                    { new: true }
+                );
+                if (!sharedFile) return ctx.reply("❌ File not found or access denied.");
+                invalidateUser(uid);
+
+                const senderName = escapeHtml(ctx.from.first_name || ctx.from.username || "Someone");
+                const caption = `📤 <b>${senderName}</b> shared a file with you:\n\n<code>${escapeHtml(sharedFile.fileName)}</code>\n📦 ${formatFileSize(sharedFile.fileSize)} • ${sharedFile.kind.toUpperCase()}`;
+                try {
+                    if (sharedFile.kind === 'photo') {
+                        await ctx.telegram.sendPhoto(target.tgUserId, sharedFile.tgFileId, { caption, parse_mode: "HTML" });
+                    } else {
+                        await ctx.telegram.sendDocument(target.tgUserId, sharedFile.tgFileId, { caption, parse_mode: "HTML" });
+                    }
+                    return ctx.replyWithHTML(`✅ File shared with @${escapeHtml(target.username)} and delivered! 📬`, KB.main(uid));
+                } catch (e) {
+                    console.error("Share delivery error:", e.message);
+                    return ctx.replyWithHTML(
+                        `✅ Shared with @${escapeHtml(target.username)}\n⚠️ Could not deliver — they may not have started the bot.`,
+                        KB.main(uid)
+                    );
+                }
+            }
+        }
+
+        // --- DEFAULT ---
+        await ctx.reply("👆 Use the buttons below:", { reply_markup: KB.main(uid).reply_markup });
+    });
+
+    // ========== FILE HANDLER ==========
     bot.on(["document", "photo", "video", "audio", "voice"], async (ctx) => {
         await withLoading(ctx, async () => {
-            const userId = await upsertUser(ctx);
+            const uid = await upsertUser(ctx);
             const m = ctx.message;
 
             let kind, obj;
@@ -1215,74 +1451,84 @@ Send /cancel to abort.
             else if (m.video) { kind = "video"; obj = m.video; }
             else if (m.audio) { kind = "audio"; obj = m.audio; }
             else if (m.voice) { kind = "voice"; obj = m.voice; }
-            else if (m.photo?.length) {
-                kind = "photo";
-                obj = m.photo[m.photo.length - 1]; // largest available size
+            else if (m.photo?.length) { kind = "photo"; obj = m.photo[m.photo.length - 1]; }
+
+            if (!obj) throw new Error("Unknown file type");
+
+            const max = CONFIG.FILE_LIMITS[kind] || 52428800;
+            if ((obj.file_size || 0) > max) throw new Error(`File too large. Max allowed: ${formatFileSize(max)}`);
+
+            const name = obj.file_name
+                || `${kind}_${Date.now()}.${kind === 'photo' ? 'jpg' : kind === 'video' ? 'mp4' : kind === 'audio' ? 'mp3' : 'bin'}`;
+
+            const user = await UserModel.findOne({ tgUserId: uid }).lean();
+            const isPriv = user?.settings?.privateByDefault || false;
+            const autoExp = user?.settings?.autoExpire;
+
+            const existing = await FileModel.findOne({ tgFileId: obj.file_id }).lean();
+            if (existing && existing.ownerTgUserId === uid) {
+                return ctx.replyWithHTML(
+                    `⚠️ <b>Already saved!</b>\n\n<code>${escapeHtml(existing.fileName)}</code>`,
+                    KB.files(existing._id.toString())
+                );
             }
-
-            if (!obj) throw new Error("Could not identify file type");
-
-            const fileSize = obj.file_size || 0;
-            const maxSize = FILE_LIMITS[kind] ?? 50 * 1024 * 1024;
-
-            if (fileSize > maxSize) {
-                throw new Error(`File too large. Maximum allowed: ${formatFileSize(maxSize)}`);
-            }
-
-            const fileName = obj.file_name
-                ?? (DEFAULT_NAMES[kind] ? DEFAULT_NAMES[kind]() : `${kind}_${Date.now()}`);
 
             const file = await FileModel.create({
-                ownerTgUserId: userId,
-                kind,
+                ownerTgUserId: uid, kind,
                 tgFileId: obj.file_id,
                 tgUniqueId: obj.file_unique_id || "",
-                fileName,
+                fileName: name.slice(0, 200),
                 mimeType: obj.mime_type || "",
-                fileSize,
-                note: "",
-                createdAt: new Date()
+                fileSize: obj.file_size || 0,
+                note: (m.caption || "").slice(0, 500),
+                isPrivate: isPriv,
+                expiresAt: autoExp && EXPIRY[autoExp] ? new Date(Date.now() + EXPIRY[autoExp]) : null,
+                folderId: ensureSession(ctx).currentFolder || null
             });
 
-            // Invalidate stats & leaderboard caches
-            memoryCache.del(`stats:${userId}`);
-            memoryCache.delPattern("leaderboard:*");
+            await UserModel.updateOne(
+                { tgUserId: uid },
+                { $inc: { storageUsed: obj.file_size || 0, fileCount: 1 } }
+            );
+            invalidateUser(uid);
 
             await ctx.replyWithHTML(`
-✅ <b>File saved successfully!</b>
+✅ <b>File Saved!</b>
 
-📄 <b>Name:</b> <code>${escapeHtml(fileName)}</code>
-📁 <b>Type:</b> ${kind}
-💾 <b>Size:</b> ${formatFileSize(fileSize)}
-⚡️ <b>Points earned:</b> +10 pts
-🆔 <b>ID:</b> <code>${file._id}</code>
+📄 <code>${escapeHtml(name)}</code>
+📦 ${formatFileSize(obj.file_size || 0)} • <b>${kind.toUpperCase()}</b>
+🔐 ${isPriv ? 'Private 🔒' : 'Public'}${file.expiresAt ? `\n⏰ Expires: ${new Date(file.expiresAt).toLocaleString()}` : ''}
 
-Open the Cloud to manage, rename, or download your files.
-Earn more points by inviting friends!
-      `.trim(), mainMenu());
-        });
+👇 Actions:
+            `.trim(), KB.files(file._id.toString()));
+        }, "💾 Uploading...");
     });
 
-    // Catch-all for unhandled callback queries  prevents spinner from hanging
+    // Catch-all callback
     bot.on("callback_query", async (ctx) => {
-        await ctx.answerCbQuery().catch(() => { });
+        await ctx.answerCbQuery("⚠️ Unknown action").catch(() => { });
     });
 
-    // ======================================================
-    // LAUNCH
-    // ======================================================
-
+    // ========== LAUNCH ==========
     await bot.launch();
-    console.log("✅ Bot started  Referral & Leaderboard system active (Optimized, No Redis)");
+    console.log(`✅ Bot v${version} online | @${bot.botInfo?.username} | Ready`);
 
-    // Graceful shutdown
-    const shutdown = (signal) => () => {
-        console.log(`\n${signal} received  shutting down…`);
-        bot.stop(signal);
+    // Log inline mode status for debugging
+    try {
+        const botInfo = await bot.telegram.getMe();
+        console.log(`🔍 Inline mode: ${botInfo.can_join_groups ? 'Enabled' : 'Check BotFather'}`);
+    } catch (e) {
+        console.warn("⚠️ Could not fetch bot info:", e.message);
+    }
+
+    const shutdown = (sig) => async () => {
+        console.log(`\n${sig} received — shutting down gracefully...`);
+        bot.stop(sig);
         memoryCache.clear();
+        rateLimitMap.clear();
+        await sleep(1000);
         process.exit(0);
     };
-
     process.once("SIGINT", shutdown("SIGINT"));
     process.once("SIGTERM", shutdown("SIGTERM"));
 
