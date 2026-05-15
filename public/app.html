@@ -1,297 +1,162 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
+
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
-  <meta name="theme-color" content="#0a0e1a" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="description" content="Cloud Storage — Save, organize, and share your files securely via Telegram" />
-  <meta name="robots" content="noindex, nofollow" />
-  
-  <title>Cloud · Storage</title>
-  
-  <!-- Preconnect for performance -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-  
-  <!-- Styles -->
-  <link rel="stylesheet" href="/app.css" />
-  
-  <!-- Telegram WebApp SDK -->
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  
-  <!-- Structured Data -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    "name": "Cloud Storage",
-    "applicationCategory": "FileApplication",
-    "operatingSystem": "Telegram",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-  }
-  </script>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Cloud · Storage</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="/public/app.css">
 </head>
-<body data-tg-theme="dark">
-  <div id="app" class="app-container">
-    
-    <!-- Header -->
-    <header class="header" role="banner">
-      <div class="user-info">
-        <h1 class="user-name" id="who" aria-live="polite">Loading...</h1>
-        <div class="user-status" id="status" aria-live="polite">
-          <span class="status-dot"></span>
-          <span class="status-text">Initializing...</span>
-        </div>
-      </div>
-      <button 
-        class="refresh-btn" 
-        id="refresh" 
-        aria-label="Refresh files"
-        title="Refresh"
-      >
-        <i class="fas fa-sync-alt"></i>
-      </button>
-    </header>
 
-    <!-- Stats -->
-    <section class="stats-grid" aria-label="Storage statistics">
-      <article class="stat-card">
-        <div class="stat-label">
-          <i class="fas fa-file-alt"></i>
-          <span>Total files</span>
-        </div>
-        <div class="stat-value" id="totalFiles">0</div>
-        <div class="stat-sub" id="fileCount">0 items</div>
-      </article>
-      <article class="stat-card">
-        <div class="stat-label">
-          <i class="fas fa-database"></i>
-          <span>Storage used</span>
-        </div>
-        <div class="stat-value" id="totalSize">0 B</div>
-        <div class="stat-sub">across all files</div>
-      </article>
-    </section>
+<body>
 
-    <!-- Categories -->
-    <section class="categories-section">
-      <div class="section-header">
-        <h2 class="section-title">Categories</h2>
-        <span class="section-badge" id="fileCountBadge">0 items</span>
-      </div>
-      <nav class="categories-scroll" role="tablist" aria-label="File categories">
-        <button 
-          class="category-chip active" 
-          data-category="all" 
-          role="tab" 
-          aria-selected="true"
-        >
-          <i class="fas fa-layer-group"></i>
-          <span>All</span>
-        </button>
-        <button 
-          class="category-chip" 
-          data-category="images" 
-          role="tab" 
-          aria-selected="false"
-        >
-          <i class="fas fa-image"></i>
-          <span>Images</span>
-        </button>
-        <button 
-          class="category-chip" 
-          data-category="documents" 
-          role="tab" 
-          aria-selected="false"
-        >
-          <i class="fas fa-file"></i>
-          <span>Documents</span>
-        </button>
-        <button 
-          class="category-chip" 
-          data-category="videos" 
-          role="tab" 
-          aria-selected="false"
-        >
-          <i class="fas fa-video"></i>
-          <span>Videos</span>
-        </button>
-        <button 
-          class="category-chip" 
-          data-category="audio" 
-          role="tab" 
-          aria-selected="false"
-        >
-          <i class="fas fa-music"></i>
-          <span>Audio</span>
-        </button>
-        <button 
-          class="category-chip" 
-          data-category="archives" 
-          role="tab" 
-          aria-selected="false"
-        >
-          <i class="fas fa-file-archive"></i>
-          <span>Archives</span>
-        </button>
-      </nav>
-    </section>
+    <div class="app-container">
 
-    <!-- Sort Controls -->
-    <div class="sort-controls">
-      <button class="sort-button" id="sortBtn" aria-label="Toggle sort order">
-        <i class="fas fa-arrow-down-wide-short"></i>
-        <span id="sortText">Latest</span>
-      </button>
+        <!-- Header -->
+        <div class="header">
+            <div class="user-info">
+                <span class="user-name" id="who">Loading...</span>
+                <span class="user-status" id="status">
+                    <span class="status-dot"></span>
+                    Initializing...
+                </span>
+            </div>
+            <button class="refresh-btn" id="refresh" title="Refresh">
+                <i class="fas fa-sync-alt"></i>
+            </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label"><i class="fas fa-layer-group"></i> Total files</div>
+                <div class="stat-value" id="totalFiles">0</div>
+                <div class="stat-sub">in cloud storage</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label"><i class="fas fa-database"></i> Storage used</div>
+                <div class="stat-value" id="totalSize">0 B</div>
+                <div class="stat-sub">across all files</div>
+            </div>
+        </div>
+
+        <!-- Categories -->
+        <div class="categories-section">
+            <div class="section-header">
+                <h2 class="section-title">Categories</h2>
+                <span class="section-badge" id="fileCount">0 items</span>
+            </div>
+            <div class="categories-scroll">
+                <button class="category-chip active" data-category="all">
+                    <i class="fas fa-border-all"></i> All
+                </button>
+                <button class="category-chip" data-category="images">
+                    <i class="fas fa-image"></i> Images
+                </button>
+                <button class="category-chip" data-category="documents">
+                    <i class="fas fa-file-lines"></i> Documents
+                </button>
+                <button class="category-chip" data-category="videos">
+                    <i class="fas fa-video"></i> Videos
+                </button>
+                <button class="category-chip" data-category="audio">
+                    <i class="fas fa-music"></i> Audio
+                </button>
+                <button class="category-chip" data-category="archives">
+                    <i class="fas fa-file-zipper"></i> Archives
+                </button>
+            </div>
+        </div>
+
+        <!-- Files Header -->
+        <div class="section-header">
+            <h2 class="section-title">Your files</h2>
+            <button class="sort-button" id="sortBtn">
+                <i class="fas fa-arrow-down-wide-short"></i>
+                <span id="sortText">Latest</span>
+            </button>
+        </div>
+
+        <!-- Files List -->
+        <div id="list" class="files-grid"></div>
+
     </div>
 
-    <!-- Files List -->
-    <main class="files-section" aria-label="Your files">
-      <h2 class="section-title" style="margin-bottom:12px;">Your files</h2>
-      <div id="list" class="files-grid" role="list" aria-live="polite">
-        <!-- Files rendered here -->
-        <div class="empty-state">
-          <div class="empty-state-icon">
-            <i class="fas fa-spinner fa-spin"></i>
-          </div>
-          <div class="empty-state-title">Loading files...</div>
-          <div class="empty-state-text">Please wait while we fetch your cloud storage</div>
+    <!-- ===== PREVIEW MODAL ===== -->
+    <div class="preview-modal" id="previewModal">
+        <div class="preview-content">
+            <div class="preview-header">
+                <button class="preview-close" id="previewClose" title="Close">
+                    <i class="fas fa-xmark"></i>
+                </button>
+                <span class="preview-title" id="previewTitle">Preview</span>
+                <div class="preview-actions">
+                    <button class="preview-action-btn" id="previewSend" title="Send via Bot">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="preview-body" id="previewBody"></div>
         </div>
-      </div>
-    </main>
-
-  </div>
-
-  <!-- File Detail Modal -->
-  <dialog id="modal" class="modal" aria-modal="true" aria-labelledby="modalTitle">
-    <div class="modal-content">
-      <header class="modal-header">
-        <h3 class="modal-title" id="modalTitle">File details</h3>
-        <button class="close-btn" id="close" aria-label="Close modal">
-          <i class="fas fa-times"></i>
-        </button>
-      </header>
-      <div class="modal-body">
-        <form id="fileForm">
-          <div class="input-group">
-            <label class="input-label" for="m_name">
-              <i class="fas fa-tag"></i>
-              File name
-            </label>
-            <input 
-              type="text" 
-              id="m_name" 
-              class="input-field" 
-              maxlength="200"
-              required
-              pattern="^.{1,200}$"
-              aria-required="true"
-            />
-          </div>
-          <div class="input-group">
-            <label class="input-label" for="m_note">
-              <i class="fas fa-sticky-note"></i>
-              Note
-            </label>
-            <textarea 
-              id="m_note" 
-              class="input-field" 
-              maxlength="500"
-              rows="3"
-              placeholder="Add a note (optional)..."
-            ></textarea>
-          </div>
-          <div class="meta-info" id="m_meta" aria-label="File metadata">
-            <!-- Metadata injected here -->
-          </div>
-        </form>
-        
-        <!-- Error suggestion -->
-        <div class="error-suggestion" id="errorSuggestion" style="display:none;" role="alert">
-          <i class="fas fa-circle-exclamation"></i>
-          <span id="errorMessage"></span>
-          <button class="btn btn-small btn-primary" id="suggestSendViaBot">
-            <i class="fas fa-paper-plane"></i>
-            Send via Bot
-          </button>
-        </div>
-      </div>
-      <footer class="modal-footer">
-        <button class="btn btn-secondary" id="sendToBot">
-          <i class="fas fa-paper-plane"></i>
-          Send
-        </button>
-        <button class="btn btn-primary" id="saveChanges">
-          <i class="fas fa-save"></i>
-          Save changes
-        </button>
-      </footer>
     </div>
-  </dialog>
 
-  <!-- Preview Modal -->
-  <dialog id="previewModal" class="preview-modal" aria-modal="true" aria-labelledby="previewTitle">
-    <div class="preview-content">
-      <header class="preview-header">
-        <h3 class="preview-title" id="previewTitle">Preview</h3>
-        <div class="preview-actions">
-          <button class="preview-action-btn" id="previewSend" aria-label="Send file via bot" title="Send">
-            <i class="fas fa-paper-plane"></i>
-          </button>
-          <button class="preview-close" id="previewClose" aria-label="Close preview">
-            <i class="fas fa-times"></i>
-          </button>
+    <!-- ===== EDIT MODAL ===== -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">File details</span>
+                <button class="close-btn" id="close"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <label class="input-label"><i class="fas fa-file"></i> File name</label>
+                    <input type="text" class="input-field" id="m_name" placeholder="Enter file name" maxlength="200">
+                </div>
+                <div class="input-group">
+                    <label class="input-label"><i class="fas fa-note-sticky"></i> Note</label>
+                    <textarea class="input-field" id="m_note" placeholder="Add a note..." rows="3"
+                        maxlength="500"></textarea>
+                </div>
+                <div class="meta-info" id="m_meta"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="saveChanges">
+                    <i class="fas fa-floppy-disk"></i> Save
+                </button>
+                <button class="btn btn-secondary" id="sendToBot">
+                    <i class="fas fa-paper-plane"></i> Send
+                </button>
+            </div>
+            <div class="error-suggestion" id="errorSuggestion" style="display:none;">
+                <i class="fas fa-circle-exclamation"></i>
+                <span id="errorMessage">Error occurred</span>
+                <button class="btn btn-primary btn-small" id="suggestSendViaBot">
+                    <i class="fas fa-paper-plane"></i> Send via Bot
+                </button>
+            </div>
         </div>
-      </header>
-      <div id="previewBody" class="preview-body" role="region" aria-label="File preview content">
-        <!-- Preview content injected here -->
-      </div>
     </div>
-  </dialog>
 
-  <!-- Context Menu -->
-  <nav id="contextMenu" class="context-menu" role="menu" aria-label="File actions">
-    <button class="context-item" data-action="preview" role="menuitem">
-      <i class="fas fa-eye"></i>
-      <span>Preview</span>
-    </button>
-    <button class="context-item" data-action="send" role="menuitem">
-      <i class="fas fa-paper-plane"></i>
-      <span>Send via Bot</span>
-    </button>
-    <button class="context-item" data-action="edit" role="menuitem">
-      <i class="fas fa-pen"></i>
-      <span>Edit details</span>
-    </button>
-  </nav>
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
 
-  <!-- Toast Notifications -->
-  <div id="toast" class="toast" role="status" aria-live="assertive" aria-atomic="true">
-    <i class="fas fa-info-circle"></i>
-    <span class="toast-message"></span>
-  </div>
+    <!-- Context Menu -->
+    <div class="context-menu" id="contextMenu">
+        <button class="context-item" data-action="preview">
+            <i class="fas fa-eye"></i> Preview
+        </button>
+        <button class="context-item" data-action="send">
+            <i class="fas fa-paper-plane"></i> Send via Bot
+        </button>
+        <button class="context-item" data-action="edit">
+            <i class="fas fa-pen"></i> Edit details
+        </button>
+    </div>
 
-  <!-- Scripts -->
-  <script src="/app.js" type="module"></script>
-  
-  <!-- Analytics / Error Tracking (optional) -->
-  <script>
-    // Basic error tracking
-    window.addEventListener('error', (e) => {
-      console.error('[APP ERROR]', e.message, e.filename, e.lineno);
-      // Send to your error tracking service here
-    });
-    window.addEventListener('unhandledrejection', (e) => {
-      console.error('[UNHANDLED PROMISE]', e.reason);
-    });
-  </script>
+    <script src="/public/app.js" defer></script>
 </body>
+
 </html>
