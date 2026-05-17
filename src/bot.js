@@ -210,7 +210,7 @@ const KB = {
         return Markup.inlineKeyboard([
             ...(appUrl ? [[
                 Markup.button.webApp(`🌐 ${await tr("menu.myFiles")}`, `${appUrl}/app`),
-                Markup.button.webApp(`🌌 Gallery`, `${appUrl}/gallery`)
+                // Markup.button.webApp(`🌌 Gallery`, `${appUrl}/gallery`)
             ]] : []),
             [
                 Markup.button.callback(`📁 ${await tr("menu.myFiles")}`, "MY_FILES"),

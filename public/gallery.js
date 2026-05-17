@@ -255,15 +255,15 @@
         if (tg) {
             tg.BackButton.show();
             tg.BackButton.onClick(() => {
-                window.location.href = '/';
+                window.location.href = '/app';
             });
         } else {
-            window.location.href = '/';
+            window.location.href = '/app';
         }
     };
 
     window.goToMain = function () {
-        window.location.href = '/';
+        window.location.href = '/app';
     };
 
     // UI Helpers

@@ -533,222 +533,7 @@
     function isVideo(file) { return getFileType(file.fileName, file.kind).category === 'videos'; }
     function isImage(file) { return getFileType(file.fileName, file.kind).category === 'images'; }
     function canPreview(file) { return isAudio(file) || isVideo(file) || isImage(file); }
-    // Video player uchun to'g'ri initialization
-    function buildVideoPlayer(file, url) {
-        el.previewBody.style.background = '#000';
-        el.previewBody.innerHTML = `
-   <div id="vpWrap" style="width:100%;height:100%;display:flex;flex-direction:column;background:#000;position:relative;overflow:hidden;">
-     <div id="vpMain" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;overflow:hidden;">
-       <video id="vpVideo" playsinline webkit-playsinline preload="metadata"
-        style="width:100%;height:100%;object-fit:contain;display:block;background:#000;"
-        poster=""
-        controlsList="nodownload">
-         <source src="${url}" type="video/mp4">
-         <source src="${url}">
-       </video>
-       <div id="vpOverlay" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;opacity:1;transition:opacity 0.3s;background:linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%);">
-         <div style="padding:16px 16px 20px;">
-           <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:8px;font-variant-numeric:tabular-nums;">
-             <span id="vpCurrent">0:00</span>
-             <span id="vpTotal">0:00</span>
-           </div>
-           <input type="range" id="vpSeekbar" min="0" max="1000" step="1" value="0"
-            style="width:100%;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.3);border-radius:99px;cursor:pointer;outline:none;margin-bottom:14px;">
-           <div style="display:flex;align-items:center;gap:10px;">
-             <button id="vpPlay" style="background:none;border:none;color:#fff;font-size:26px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
-               <i class="fas fa-play" id="vpPlayIcon"></i>
-             </button>
-             <button id="vpMute" style="background:none;border:none;color:rgba(255,255,255,0.8);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
-               <i class="fas fa-volume-high" id="vpMuteIcon"></i>
-             </button>
-             <input type="range" id="vpVolume" min="0" max="1" step="0.02" value="1"
-              style="width:70px;height:3px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.4);border-radius:99px;cursor:pointer;outline:none;flex-shrink:0;">
-             <span style="flex:1"></span>
-             <span id="vpResInfo" style="font-size:11px;color:rgba(255,255,255,0.5);"></span>
-             <button id="vpFullscreen" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
-               <i class="fas fa-expand" id="vpFsIcon"></i>
-             </button>
-           </div>
-         </div>
-       </div>
-       <div id="vpCenterPlay" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:30px;color:#fff;opacity:1;transition:all 0.3s ease;cursor:pointer;">
-         <i class="fas fa-play"></i>
-       </div>
-     </div>
-   </div>`;
 
-        initVideoPlayer(file);
-    }
-
-    // Video player initialization - yangilangan
-    function initVideoPlayer(file) {
-        const vid = $('vpVideo'), overlay = $('vpOverlay'), vpMain = $('vpMain');
-        const vpCenterPlay = $('vpCenterPlay');
-
-        if (!vid) return;
-        state.vp.video = vid;
-
-        const vpPlay = $('vpPlay'), vpPlayIcon = $('vpPlayIcon');
-        const vpMute = $('vpMute'), vpMuteIcon = $('vpMuteIcon');
-        const vpVolume = $('vpVolume');
-        const vpCurrent = $('vpCurrent'), vpTotal = $('vpTotal'), vpSeekbar = $('vpSeekbar');
-        const vpFullscreen = $('vpFullscreen'), vpFsIcon = $('vpFsIcon');
-        const vpResInfo = $('vpResInfo');
-        let controlsTimer = null;
-
-        function showControls() {
-            overlay.style.opacity = '1';
-            vpCenterPlay.style.opacity = '0';
-            clearTimeout(controlsTimer);
-            controlsTimer = setTimeout(() => {
-                if (!vid.paused) {
-                    overlay.style.opacity = '0';
-                    vpCenterPlay.style.opacity = '0';
-                }
-            }, 3500);
-        }
-
-        function updatePlayUI() {
-            vpPlayIcon.className = vid.paused ? 'fas fa-play' : 'fas fa-pause';
-        }
-
-        // Video events
-        vid.addEventListener('loadedmetadata', () => {
-            vpTotal.textContent = formatTime(vid.duration);
-            if (vid.videoWidth && vid.videoHeight) {
-                vpResInfo.textContent = vid.videoWidth + 'x' + vid.videoHeight;
-            }
-        });
-
-        vid.addEventListener('timeupdate', () => {
-            vpCurrent.textContent = formatTime(vid.currentTime);
-            if (vid.duration) {
-                vpSeekbar.value = (vid.currentTime / vid.duration) * 1000;
-            }
-        });
-
-        vid.addEventListener('ended', () => {
-            updatePlayUI();
-            overlay.style.opacity = '1';
-            clearTimeout(controlsTimer);
-        });
-
-        vid.addEventListener('error', (e) => {
-            console.error('Video error:', e);
-            showToast(tr("ui.cannotPlayVideo"), 'error');
-        });
-
-        vid.addEventListener('play', () => {
-            updatePlayUI();
-            vpCenterPlay.style.opacity = '0';
-        });
-
-        vid.addEventListener('pause', () => {
-            updatePlayUI();
-            overlay.style.opacity = '1';
-            clearTimeout(controlsTimer);
-        });
-
-        vid.addEventListener('click', (e) => {
-            if (e.target.closest('button') || e.target.closest('input')) return;
-            if (vid.paused) {
-                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
-            } else {
-                vid.pause();
-            }
-            showControls();
-        });
-
-        // Play button
-        vpPlay.addEventListener('click', e => {
-            e.stopPropagation();
-            if (vid.paused) {
-                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
-            } else {
-                vid.pause();
-            }
-            showControls();
-        });
-
-        // Center play button
-        vpCenterPlay.addEventListener('click', e => {
-            e.stopPropagation();
-            if (vid.paused) {
-                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
-            } else {
-                vid.pause();
-            }
-            showControls();
-        });
-
-        // Mute button
-        vpMute.addEventListener('click', e => {
-            e.stopPropagation();
-            vid.muted = !vid.muted;
-            vpMuteIcon.className = vid.muted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
-        });
-
-        // Volume
-        vpVolume.addEventListener('input', e => {
-            e.stopPropagation();
-            vid.volume = parseFloat(vpVolume.value);
-            vid.muted = vid.volume === 0;
-            vpMuteIcon.className = vid.muted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
-        });
-
-        // Seekbar
-        vpSeekbar.addEventListener('input', e => {
-            e.stopPropagation();
-            if (vid.duration) {
-                vid.currentTime = (parseFloat(vpSeekbar.value) / 1000) * vid.duration;
-            }
-        });
-
-        // Fullscreen
-        vpFullscreen.addEventListener('click', e => {
-            e.stopPropagation();
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                (vpMain.requestFullscreen?.() || vpMain.webkitRequestFullscreen?.() || vid.webkitEnterFullscreen?.());
-                vpFsIcon.className = 'fas fa-compress';
-            } else {
-                (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
-                vpFsIcon.className = 'fas fa-expand';
-            }
-        });
-
-        document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement) {
-                vpFsIcon.className = 'fas fa-expand';
-            }
-        });
-
-        document.addEventListener('webkitfullscreenchange', () => {
-            if (!document.webkitFullscreenElement) {
-                vpFsIcon.className = 'fas fa-expand';
-            }
-        });
-
-        // Touch events
-        vpMain.addEventListener('touchstart', e => {
-            if (e.target.closest('button') || e.target.closest('input')) return;
-            showControls();
-        }, { passive: true });
-
-        overlay.addEventListener('click', e => e.stopPropagation());
-
-        // Show controls initially
-        showControls();
-
-        // Auto play
-        const playPromise = vid.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(() => {
-                updatePlayUI();
-                overlay.style.opacity = '1';
-                vpCenterPlay.style.opacity = '1';
-            });
-        }
-    }
     // ===== API =====
     async function api(path, opts = {}) {
         const headers = {
@@ -1212,48 +997,58 @@
     }
 
     // ===== VIDEO PLAYER =====
+    // Video player uchun to'g'ri initialization
     function buildVideoPlayer(file, url) {
         el.previewBody.style.background = '#000';
         el.previewBody.innerHTML = `
-      <div id="vpWrap" style="width:100%;height:100%;display:flex;flex-direction:column;background:#000;position:relative;overflow:hidden;">
-        <div id="vpMain" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;overflow:hidden;">
-          <video id="vpVideo" playsinline webkit-playsinline preload="auto"
-            style="width:100%;height:100%;object-fit:contain;display:block;background:#000;">
-            <source src="${url}" type="video/mp4">
-            <source src="${url}">
-          </video>
-          <div id="vpOverlay" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;opacity:1;transition:opacity 0.3s;background:linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%);">
-            <div style="padding:16px 16px 20px;">
-              <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:8px;font-variant-numeric:tabular-nums;">
-                <span id="vpCurrent">0:00</span>
-                <span id="vpTotal">0:00</span>
-              </div>
-              <input type="range" id="vpSeekbar" min="0" max="1000" step="1" value="0"
-                style="width:100%;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.3);border-radius:99px;cursor:pointer;outline:none;margin-bottom:14px;">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <button id="vpPlay" style="background:none;border:none;color:#fff;font-size:26px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
-                  <i class="fas fa-play" id="vpPlayIcon"></i>
-                </button>
-                <button id="vpMute" style="background:none;border:none;color:rgba(255,255,255,0.8);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
-                  <i class="fas fa-volume-high" id="vpMuteIcon"></i>
-                </button>
-                <input type="range" id="vpVolume" min="0" max="1" step="0.02" value="1"
-                  style="width:70px;height:3px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.4);border-radius:99px;cursor:pointer;outline:none;flex-shrink:0;">
-                <span style="flex:1"></span>
-                <span id="vpResInfo" style="font-size:11px;color:rgba(255,255,255,0.5);"></span>
-                <button id="vpFullscreen" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
-                  <i class="fas fa-expand" id="vpFsIcon"></i>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>`;
+   <div id="vpWrap" style="width:100%;height:100%;display:flex;flex-direction:column;background:#000;position:relative;overflow:hidden;">
+     <div id="vpMain" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;overflow:hidden;">
+       <video id="vpVideo" playsinline webkit-playsinline preload="metadata"
+        style="width:100%;height:100%;object-fit:contain;display:block;background:#000;"
+        poster=""
+        controlsList="nodownload">
+         <source src="${url}" type="video/mp4">
+         <source src="${url}">
+       </video>
+       <div id="vpOverlay" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;opacity:1;transition:opacity 0.3s;background:linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%);">
+         <div style="padding:16px 16px 20px;">
+           <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:8px;font-variant-numeric:tabular-nums;">
+             <span id="vpCurrent">0:00</span>
+             <span id="vpTotal">0:00</span>
+           </div>
+           <input type="range" id="vpSeekbar" min="0" max="1000" step="1" value="0"
+            style="width:100%;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.3);border-radius:99px;cursor:pointer;outline:none;margin-bottom:14px;">
+           <div style="display:flex;align-items:center;gap:10px;">
+             <button id="vpPlay" style="background:none;border:none;color:#fff;font-size:26px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+               <i class="fas fa-play" id="vpPlayIcon"></i>
+             </button>
+             <button id="vpMute" style="background:none;border:none;color:rgba(255,255,255,0.8);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+               <i class="fas fa-volume-high" id="vpMuteIcon"></i>
+             </button>
+             <input type="range" id="vpVolume" min="0" max="1" step="0.02" value="1"
+              style="width:70px;height:3px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.4);border-radius:99px;cursor:pointer;outline:none;flex-shrink:0;">
+             <span style="flex:1"></span>
+             <span id="vpResInfo" style="font-size:11px;color:rgba(255,255,255,0.5);"></span>
+             <button id="vpFullscreen" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+               <i class="fas fa-expand" id="vpFsIcon"></i>
+             </button>
+           </div>
+         </div>
+       </div>
+       <div id="vpCenterPlay" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:30px;color:#fff;opacity:1;transition:all 0.3s ease;cursor:pointer;">
+         <i class="fas fa-play"></i>
+       </div>
+     </div>
+   </div>`;
+
         initVideoPlayer(file);
     }
 
+    // Video player initialization - yangilangan
     function initVideoPlayer(file) {
         const vid = $('vpVideo'), overlay = $('vpOverlay'), vpMain = $('vpMain');
+        const vpCenterPlay = $('vpCenterPlay');
+
         if (!vid) return;
         state.vp.video = vid;
 
@@ -1267,38 +1062,97 @@
 
         function showControls() {
             overlay.style.opacity = '1';
+            vpCenterPlay.style.opacity = '0';
             clearTimeout(controlsTimer);
-            controlsTimer = setTimeout(() => { if (!vid.paused) overlay.style.opacity = '0'; }, 3500);
+            controlsTimer = setTimeout(() => {
+                if (!vid.paused) {
+                    overlay.style.opacity = '0';
+                    vpCenterPlay.style.opacity = '0';
+                }
+            }, 3500);
         }
 
-        function updatePlayUI() { vpPlayIcon.className = vid.paused ? 'fas fa-play' : 'fas fa-pause'; }
+        function updatePlayUI() {
+            vpPlayIcon.className = vid.paused ? 'fas fa-play' : 'fas fa-pause';
+        }
 
+        // Video events
         vid.addEventListener('loadedmetadata', () => {
             vpTotal.textContent = formatTime(vid.duration);
-            if (vid.videoWidth && vid.videoHeight) vpResInfo.textContent = vid.videoWidth + 'x' + vid.videoHeight;
+            if (vid.videoWidth && vid.videoHeight) {
+                vpResInfo.textContent = vid.videoWidth + 'x' + vid.videoHeight;
+            }
         });
+
         vid.addEventListener('timeupdate', () => {
             vpCurrent.textContent = formatTime(vid.currentTime);
-            if (vid.duration) vpSeekbar.value = (vid.currentTime / vid.duration) * 1000;
+            if (vid.duration) {
+                vpSeekbar.value = (vid.currentTime / vid.duration) * 1000;
+            }
         });
-        vid.addEventListener('ended', () => { updatePlayUI(); overlay.style.opacity = '1'; clearTimeout(controlsTimer); });
-        vid.addEventListener('error', () => showToast(tr("ui.cannotPlayVideo"), 'error'));
-        vid.addEventListener('play', updatePlayUI);
-        vid.addEventListener('pause', () => { updatePlayUI(); overlay.style.opacity = '1'; clearTimeout(controlsTimer); });
 
-        vpPlay.addEventListener('click', e => {
-            e.stopPropagation();
-            if (vid.paused) vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
-            else vid.pause();
+        vid.addEventListener('ended', () => {
+            updatePlayUI();
+            overlay.style.opacity = '1';
+            clearTimeout(controlsTimer);
+        });
+
+        vid.addEventListener('error', (e) => {
+            console.error('Video error:', e);
+            showToast(tr("ui.cannotPlayVideo"), 'error');
+        });
+
+        vid.addEventListener('play', () => {
+            updatePlayUI();
+            vpCenterPlay.style.opacity = '0';
+        });
+
+        vid.addEventListener('pause', () => {
+            updatePlayUI();
+            overlay.style.opacity = '1';
+            clearTimeout(controlsTimer);
+        });
+
+        vid.addEventListener('click', (e) => {
+            if (e.target.closest('button') || e.target.closest('input')) return;
+            if (vid.paused) {
+                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
+            } else {
+                vid.pause();
+            }
             showControls();
         });
 
+        // Play button
+        vpPlay.addEventListener('click', e => {
+            e.stopPropagation();
+            if (vid.paused) {
+                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
+            } else {
+                vid.pause();
+            }
+            showControls();
+        });
+
+        // Center play button
+        vpCenterPlay.addEventListener('click', e => {
+            e.stopPropagation();
+            if (vid.paused) {
+                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
+            } else {
+                vid.pause();
+            }
+            showControls();
+        });
+
+        // Mute button
         vpMute.addEventListener('click', e => {
             e.stopPropagation();
             vid.muted = !vid.muted;
             vpMuteIcon.className = vid.muted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
         });
 
+        // Volume
         vpVolume.addEventListener('input', e => {
             e.stopPropagation();
             vid.volume = parseFloat(vpVolume.value);
@@ -1306,11 +1160,15 @@
             vpMuteIcon.className = vid.muted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
         });
 
+        // Seekbar
         vpSeekbar.addEventListener('input', e => {
             e.stopPropagation();
-            if (vid.duration) vid.currentTime = (parseFloat(vpSeekbar.value) / 1000) * vid.duration;
+            if (vid.duration) {
+                vid.currentTime = (parseFloat(vpSeekbar.value) / 1000) * vid.duration;
+            }
         });
 
+        // Fullscreen
         vpFullscreen.addEventListener('click', e => {
             e.stopPropagation();
             if (!document.fullscreenElement && !document.webkitFullscreenElement) {
@@ -1322,16 +1180,38 @@
             }
         });
 
-        document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) vpFsIcon.className = 'fas fa-expand'; });
-        document.addEventListener('webkitfullscreenchange', () => { if (!document.webkitFullscreenElement) vpFsIcon.className = 'fas fa-expand'; });
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                vpFsIcon.className = 'fas fa-expand';
+            }
+        });
 
-        vpMain.addEventListener('click', e => { if (e.target.closest('button') || e.target.closest('input')) return; showControls(); });
-        vpMain.addEventListener('touchstart', e => { if (e.target.closest('button') || e.target.closest('input')) return; showControls(); }, { passive: true });
+        document.addEventListener('webkitfullscreenchange', () => {
+            if (!document.webkitFullscreenElement) {
+                vpFsIcon.className = 'fas fa-expand';
+            }
+        });
+
+        // Touch events
+        vpMain.addEventListener('touchstart', e => {
+            if (e.target.closest('button') || e.target.closest('input')) return;
+            showControls();
+        }, { passive: true });
+
         overlay.addEventListener('click', e => e.stopPropagation());
 
+        // Show controls initially
         showControls();
+
+        // Auto play
         const playPromise = vid.play();
-        if (playPromise !== undefined) playPromise.catch(() => { updatePlayUI(); overlay.style.opacity = '1'; });
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                updatePlayUI();
+                overlay.style.opacity = '1';
+                vpCenterPlay.style.opacity = '1';
+            });
+        }
     }
 
     // ===== MODAL EVENTS =====
