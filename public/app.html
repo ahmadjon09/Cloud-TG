@@ -21,7 +21,7 @@
                 <span class="user-name" id="who">Loading...</span>
                 <span class="user-status" id="status">
                     <span class="status-dot"></span>
-                    Initializing...
+                    <span data-i18n="ui.initializing">Initializing...</span>
                 </span>
             </div>
             <button class="refresh-btn" id="refresh" title="Refresh">
@@ -32,51 +32,53 @@
         <!-- Stats -->
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label"><i class="fas fa-layer-group"></i> Total files</div>
+                <div class="stat-label"><i class="fas fa-layer-group"></i> <span data-i18n="ui.totalFiles">Total
+                        files</span></div>
                 <div class="stat-value" id="totalFiles">0</div>
-                <div class="stat-sub">in cloud storage</div>
+                <div class="stat-sub" data-i18n="ui.inCloud">in cloud storage</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label"><i class="fas fa-database"></i> Storage used</div>
+                <div class="stat-label"><i class="fas fa-database"></i> <span data-i18n="ui.storageUsed">Storage
+                        used</span></div>
                 <div class="stat-value" id="totalSize">0 B</div>
-                <div class="stat-sub">across all files</div>
+                <div class="stat-sub" data-i18n="ui.acrossFiles">across all files</div>
             </div>
         </div>
 
         <!-- Categories -->
         <div class="categories-section">
             <div class="section-header">
-                <h2 class="section-title">Categories</h2>
-                <span class="section-badge" id="fileCount">0 items</span>
+                <h2 class="section-title" data-i18n="ui.categories">Categories</h2>
+                <span class="section-badge" id="fileCount">0 <span data-i18n="ui.items">items</span></span>
             </div>
             <div class="categories-scroll">
                 <button class="category-chip active" data-category="all">
-                    <i class="fas fa-border-all"></i> All
+                    <i class="fas fa-border-all"></i> <span data-i18n="ui.all">All</span>
                 </button>
                 <button class="category-chip" data-category="images">
-                    <i class="fas fa-image"></i> Images
+                    <i class="fas fa-image"></i> <span data-i18n="ui.images">Images</span>
                 </button>
                 <button class="category-chip" data-category="documents">
-                    <i class="fas fa-file-lines"></i> Documents
+                    <i class="fas fa-file-lines"></i> <span data-i18n="ui.documents">Documents</span>
                 </button>
                 <button class="category-chip" data-category="videos">
-                    <i class="fas fa-video"></i> Videos
+                    <i class="fas fa-video"></i> <span data-i18n="ui.videos">Videos</span>
                 </button>
                 <button class="category-chip" data-category="audio">
-                    <i class="fas fa-music"></i> Audio
+                    <i class="fas fa-music"></i> <span data-i18n="ui.audio">Audio</span>
                 </button>
                 <button class="category-chip" data-category="archives">
-                    <i class="fas fa-file-zipper"></i> Archives
+                    <i class="fas fa-file-zipper"></i> <span data-i18n="ui.archives">Archives</span>
                 </button>
             </div>
         </div>
 
         <!-- Files Header -->
         <div class="section-header">
-            <h2 class="section-title">Your files</h2>
+            <h2 class="section-title" data-i18n="ui.yourFiles">Your files</h2>
             <button class="sort-button" id="sortBtn">
                 <i class="fas fa-arrow-down-wide-short"></i>
-                <span id="sortText">Latest</span>
+                <span id="sortText" data-i18n="ui.latest">Latest</span>
             </button>
         </div>
 
@@ -92,7 +94,7 @@
                 <button class="preview-close" id="previewClose" title="Close">
                     <i class="fas fa-xmark"></i>
                 </button>
-                <span class="preview-title" id="previewTitle">Preview</span>
+                <span class="preview-title" id="previewTitle" data-i18n="ui.preview">Preview</span>
                 <div class="preview-actions">
                     <button class="preview-action-btn" id="previewSend" title="Send via Bot">
                         <i class="fas fa-paper-plane"></i>
@@ -107,34 +109,37 @@
     <div class="modal" id="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <span class="modal-title">File details</span>
+                <span class="modal-title" data-i18n="ui.fileDetails">File details</span>
                 <button class="close-btn" id="close"><i class="fas fa-xmark"></i></button>
             </div>
             <div class="modal-body">
                 <div class="input-group">
-                    <label class="input-label"><i class="fas fa-file"></i> File name</label>
-                    <input type="text" class="input-field" id="m_name" placeholder="Enter file name" maxlength="200">
+                    <label class="input-label"><i class="fas fa-file"></i> <span data-i18n="ui.fileName">File
+                            name</span></label>
+                    <input type="text" class="input-field" id="m_name" data-i18n-placeholder="ui.enterFileName"
+                        placeholder="Enter file name" maxlength="200">
                 </div>
                 <div class="input-group">
-                    <label class="input-label"><i class="fas fa-note-sticky"></i> Note</label>
-                    <textarea class="input-field" id="m_note" placeholder="Add a note..." rows="3"
-                        maxlength="500"></textarea>
+                    <label class="input-label"><i class="fas fa-note-sticky"></i> <span
+                            data-i18n="ui.note">Note</span></label>
+                    <textarea class="input-field" id="m_note" data-i18n-placeholder="ui.addNote"
+                        placeholder="Add a note..." rows="3" maxlength="500"></textarea>
                 </div>
                 <div class="meta-info" id="m_meta"></div>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" id="saveChanges">
-                    <i class="fas fa-floppy-disk"></i> Save
+                    <i class="fas fa-floppy-disk"></i> <span data-i18n="ui.save">Save</span>
                 </button>
                 <button class="btn btn-secondary" id="sendToBot">
-                    <i class="fas fa-paper-plane"></i> Send
+                    <i class="fas fa-paper-plane"></i> <span data-i18n="ui.send">Send</span>
                 </button>
             </div>
             <div class="error-suggestion" id="errorSuggestion" style="display:none;">
                 <i class="fas fa-circle-exclamation"></i>
-                <span id="errorMessage">Error occurred</span>
+                <span id="errorMessage" data-i18n="ui.errorOccurred">Error occurred</span>
                 <button class="btn btn-primary btn-small" id="suggestSendViaBot">
-                    <i class="fas fa-paper-plane"></i> Send via Bot
+                    <i class="fas fa-paper-plane"></i> <span data-i18n="ui.sendViaBot">Send via Bot</span>
                 </button>
             </div>
         </div>
@@ -146,13 +151,13 @@
     <!-- Context Menu -->
     <div class="context-menu" id="contextMenu">
         <button class="context-item" data-action="preview">
-            <i class="fas fa-eye"></i> Preview
+            <i class="fas fa-eye"></i> <span data-i18n="ui.preview">Preview</span>
         </button>
         <button class="context-item" data-action="send">
-            <i class="fas fa-paper-plane"></i> Send via Bot
+            <i class="fas fa-paper-plane"></i> <span data-i18n="ui.sendViaBot">Send via Bot</span>
         </button>
         <button class="context-item" data-action="edit">
-            <i class="fas fa-pen"></i> Edit details
+            <i class="fas fa-pen"></i> <span data-i18n="ui.editDetails">Edit details</span>
         </button>
     </div>
 

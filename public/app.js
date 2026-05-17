@@ -1,9 +1,10 @@
-// ===== CLOUD STORAGE - PREMIUM APP.JS =====
+// ===== CLOUD STORAGE - PREMIUM APP.JS with i18n =====
 (function () {
     const tg = window.Telegram?.WebApp;
     let initData = "";
     let user = null;
     let firstLoad = true;
+    let currentLang = "en"; // Will be set from user/Telegram
 
     if (tg) {
         tg.ready();
@@ -12,9 +13,239 @@
         initData = tg.initData || "";
         user = tg.initDataUnsafe?.user;
         if (tg.colorScheme) document.body.setAttribute('data-tg-theme', tg.colorScheme);
+        // Detect lang from Telegram
+        if (user?.language_code) {
+            const lc = user.language_code.split("-")[0].toLowerCase();
+            if (["en", "uz", "ru"].includes(lc)) currentLang = lc;
+        }
     } else {
         initData = "test_init_data";
-        user = { id: "123456789", username: "test_user", first_name: "Test", last_name: "User" };
+        user = { id: "123456789", username: "test_user", first_name: "Test", last_name: "User", language_code: "en" };
+    }
+
+    // ===== i18n TRANSLATIONS =====
+    const TRANSLATIONS = {
+        en: {
+            ui: {
+                initializing: "Initializing...",
+                connected: "Connected",
+                demoMode: "Demo mode",
+                loading: "Loading...",
+                updated: "Updated",
+                error: "Error",
+                totalFiles: "Total files",
+                inCloud: "in cloud storage",
+                storageUsed: "Storage used",
+                acrossFiles: "across all files",
+                categories: "Categories",
+                items: "items",
+                item: "item",
+                all: "All",
+                images: "Images",
+                documents: "Documents",
+                videos: "Videos",
+                audio: "Audio",
+                archives: "Archives",
+                yourFiles: "Your files",
+                latest: "Latest",
+                oldest: "Oldest",
+                preview: "Preview",
+                fileDetails: "File details",
+                fileName: "File name",
+                enterFileName: "Enter file name",
+                note: "Note",
+                addNote: "Add a note...",
+                save: "Save",
+                send: "Send",
+                sendViaBot: "Send via Bot",
+                editDetails: "Edit details",
+                errorOccurred: "Error occurred",
+                noFiles: "No files here",
+                noFilesText: "Send files to the bot to see them here",
+                failedToLoad: "Failed to load",
+                tryAgain: "Try again",
+                sending: "Sending...",
+                sent: "Sent ✓",
+                failedToSend: "Failed to send",
+                saving: "Saving...",
+                saved: "Saved ✓",
+                failedToSave: "Failed to save",
+                filesLoaded: "Files loaded ✓",
+                fileNameEmpty: "File name cannot be empty",
+                playbackFailed: "Playback failed",
+                cannotPlay: "Cannot play this file",
+                cannotPlayVideo: "Cannot play this video",
+                playlist: "Playlist",
+                tracks: "tracks",
+                type: "Type",
+                size: "Size",
+                created: "Created",
+            }
+        },
+        uz: {
+            ui: {
+                initializing: "Yuklanmoqda...",
+                connected: "Ulandi",
+                demoMode: "Demo rejim",
+                loading: "Yuklanmoqda...",
+                updated: "Yangilandi",
+                error: "Xatolik",
+                totalFiles: "Jami fayllar",
+                inCloud: "bulut xotirada",
+                storageUsed: "Ishlatilgan joy",
+                acrossFiles: "barcha fayllar bo'yicha",
+                categories: "Kategoriyalar",
+                items: "ta element",
+                item: "ta element",
+                all: "Barchasi",
+                images: "Rasmlar",
+                documents: "Hujjatlar",
+                videos: "Videolar",
+                audio: "Audio",
+                archives: "Arxivlar",
+                yourFiles: "Sizning fayllaringiz",
+                latest: "Yangi",
+                oldest: "Eski",
+                preview: "Ko'rish",
+                fileDetails: "Fayl ma'lumotlari",
+                fileName: "Fayl nomi",
+                enterFileName: "Fayl nomini kiriting",
+                note: "Eslatma",
+                addNote: "Eslatma qo'shing...",
+                save: "Saqlash",
+                send: "Yuborish",
+                sendViaBot: "Bot orqali yuborish",
+                editDetails: "Ma'lumotlarni tahrirlash",
+                errorOccurred: "Xatolik yuz berdi",
+                noFiles: "Bu yerda fayllar yo'q",
+                noFilesText: "Fayllarni ko'rish uchun botga yuboring",
+                failedToLoad: "Yuklab bo'lmadi",
+                tryAgain: "Qayta urinib ko'ring",
+                sending: "Yuborilmoqda...",
+                sent: "Yuborildi ✓",
+                failedToSend: "Yuborib bo'lmadi",
+                saving: "Saqlanmoqda...",
+                saved: "Saqlandi ✓",
+                failedToSave: "Saqlab bo'lmadi",
+                filesLoaded: "Fayllar yuklandi ✓",
+                fileNameEmpty: "Fayl nomi bo'sh bo'lishi mumkin emas",
+                playbackFailed: "Ijro amalga oshmadi",
+                cannotPlay: "Bu faylni ijro etib bo'lmadi",
+                cannotPlayVideo: "Bu videoni ijro etib bo'lmadi",
+                playlist: "Playlist",
+                tracks: "ta trek",
+                type: "Tur",
+                size: "Hajm",
+                created: "Yaratilgan",
+            }
+        },
+        ru: {
+            ui: {
+                initializing: "Инициализация...",
+                connected: "Подключено",
+                demoMode: "Демо режим",
+                loading: "Загрузка...",
+                updated: "Обновлено",
+                error: "Ошибка",
+                totalFiles: "Всего файлов",
+                inCloud: "в облачном хранилище",
+                storageUsed: "Использовано места",
+                acrossFiles: "по всем файлам",
+                categories: "Категории",
+                items: "элементов",
+                item: "элемент",
+                all: "Все",
+                images: "Изображения",
+                documents: "Документы",
+                videos: "Видео",
+                audio: "Аудио",
+                archives: "Архивы",
+                yourFiles: "Ваши файлы",
+                latest: "Новые",
+                oldest: "Старые",
+                preview: "Просмотр",
+                fileDetails: "Детали файла",
+                fileName: "Имя файла",
+                enterFileName: "Введите имя файла",
+                note: "Заметка",
+                addNote: "Добавьте заметку...",
+                save: "Сохранить",
+                send: "Отправить",
+                sendViaBot: "Отправить через бота",
+                editDetails: "Изменить детали",
+                errorOccurred: "Произошла ошибка",
+                noFiles: "Файлов нет",
+                noFilesText: "Отправьте файлы боту, чтобы увидеть их здесь",
+                failedToLoad: "Не удалось загрузить",
+                tryAgain: "Попробовать снова",
+                sending: "Отправка...",
+                sent: "Отправлено ✓",
+                failedToSend: "Не удалось отправить",
+                saving: "Сохранение...",
+                saved: "Сохранено ✓",
+                failedToSave: "Не удалось сохранить",
+                filesLoaded: "Файлы загружены ✓",
+                fileNameEmpty: "Имя файла не может быть пустым",
+                playbackFailed: "Ошибка воспроизведения",
+                cannotPlay: "Не удалось воспроизвести файл",
+                cannotPlayVideo: "Не удалось воспроизвести видео",
+                playlist: "Плейлист",
+                tracks: "треков",
+                type: "Тип",
+                size: "Размер",
+                created: "Создан",
+            }
+        }
+    };
+
+    // ===== i18n HELPERS =====
+    function tr(key) {
+        const parts = key.split(".");
+        let obj = TRANSLATIONS[currentLang] || TRANSLATIONS["en"];
+        for (const part of parts) {
+            if (obj && obj[part] !== undefined) obj = obj[part];
+            else {
+                // Fallback to English
+                let fb = TRANSLATIONS["en"];
+                for (const p of parts) { if (fb && fb[p] !== undefined) fb = fb[p]; else return key; }
+                return typeof fb === "string" ? fb : key;
+            }
+        }
+        return typeof obj === "string" ? obj : key;
+    }
+
+    // Apply translations to static data-i18n elements
+    function applyTranslations() {
+        document.querySelectorAll("[data-i18n]").forEach(el => {
+            const key = el.dataset.i18n;
+            const text = tr(key);
+            if (text !== key) el.textContent = text;
+        });
+        document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+            const key = el.dataset.i18nPlaceholder;
+            const text = tr(key);
+            if (text !== key) el.placeholder = text;
+        });
+        // Update html lang attribute
+        document.documentElement.lang = currentLang;
+    }
+
+    // Try to get user's preferred language from the API
+    async function fetchUserLang() {
+        try {
+            const r = await fetch('/api/me', {
+                headers: { 'x-telegram-init-data': initData }
+            });
+            if (r.ok) {
+                const data = await r.json();
+                if (data.language && ["en", "uz", "ru"].includes(data.language)) {
+                    currentLang = data.language;
+                }
+            }
+        } catch (e) {
+            // Keep detected lang from Telegram
+        }
+        applyTranslations();
     }
 
     // ===== DOM =====
@@ -46,33 +277,28 @@
         longPressTimeout: null,
         currentFile: null,
         previewFile: null,
-        // Music player state
         mp: {
-            audio: null,
-            playlist: [],
-            currentIdx: 0,
-            isPlaying: false,
-            isRepeat: false,
-            isShuffle: false,
-            duration: 0,
-            progressInterval: null
+            audio: null, playlist: [], currentIdx: 0,
+            isPlaying: false, isRepeat: false, isShuffle: false,
+            duration: 0, progressInterval: null
         },
-        // Video player state
-        vp: {
-            video: null,
-            hideTimeout: null
-        }
+        vp: { video: null, hideTimeout: null }
     };
 
     // ===== USER INFO =====
     if (user) {
         const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.username || 'User';
         el.who.textContent = name;
-        el.status.innerHTML = `<span class="status-dot"></span> Connected`;
+        el.status.innerHTML = `<span class="status-dot"></span> ${tr("ui.connected")}`;
     } else {
         el.who.textContent = 'Guest User';
-        el.status.innerHTML = `<span class="status-dot"></span> Demo mode`;
+        el.status.innerHTML = `<span class="status-dot"></span> ${tr("ui.demoMode")}`;
     }
+
+    // Apply translations immediately (before API response)
+    applyTranslations();
+    // Then fetch from API to get saved preference
+    fetchUserLang();
 
     // ===== UTILITIES =====
     function showToast(msg, type = 'info', dur = 2500) {
@@ -103,6 +329,18 @@
         return `${m}:${s.toString().padStart(2, '0')}`;
     }
 
+    function formatDate(dateStr) {
+        return new Date(dateStr).toLocaleDateString(currentLang === 'ru' ? 'ru-RU' : currentLang === 'uz' ? 'uz-UZ' : 'en-US', {
+            month: 'short', day: 'numeric', year: 'numeric'
+        });
+    }
+
+    function formatDateLong(dateStr) {
+        return new Date(dateStr).toLocaleString(currentLang === 'ru' ? 'ru-RU' : currentLang === 'uz' ? 'uz-UZ' : 'en-US', {
+            year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+    }
+
     function getFileType(name, kind) {
         const ext = (name || '').split('.').pop().toLowerCase();
         const k = (kind || '').toLowerCase();
@@ -120,18 +358,10 @@
         return { category: 'documents', icon: 'fa-file', color: '#6b7280' };
     }
 
-    function isAudio(file) {
-        return getFileType(file.fileName, file.kind).category === 'audio';
-    }
-    function isVideo(file) {
-        return getFileType(file.fileName, file.kind).category === 'videos';
-    }
-    function isImage(file) {
-        return getFileType(file.fileName, file.kind).category === 'images';
-    }
-    function canPreview(file) {
-        return isAudio(file) || isVideo(file) || isImage(file);
-    }
+    function isAudio(file) { return getFileType(file.fileName, file.kind).category === 'audio'; }
+    function isVideo(file) { return getFileType(file.fileName, file.kind).category === 'videos'; }
+    function isImage(file) { return getFileType(file.fileName, file.kind).category === 'images'; }
+    function canPreview(file) { return isAudio(file) || isVideo(file) || isImage(file); }
 
     // ===== API =====
     async function api(path, opts = {}) {
@@ -151,31 +381,30 @@
         const size = files.reduce((a, f) => a + (f.fileSize || 0), 0);
         el.totalFiles.textContent = total;
         el.totalSize.textContent = formatSize(size);
-        el.fileCount.textContent = `${total} ${total === 1 ? 'item' : 'items'}`;
+        el.fileCount.textContent = `${total} ${total === 1 ? tr("ui.item") : tr("ui.items")}`;
     }
 
     // ===== LOAD =====
     async function load() {
-        setStatus('Loading...', true);
+        setStatus(tr("ui.loading"), true);
         el.refresh.disabled = true;
         try {
             const items = await api('/api/files');
             state.filesData = items;
             updateStats(items);
             filterAndRenderFiles();
-            setStatus('Updated');
-            // Only show toast on first load
-            if (firstLoad) { firstLoad = false; showToast('Files loaded ✓', 'success', 1800); }
+            setStatus(tr("ui.updated"));
+            if (firstLoad) { firstLoad = false; showToast(tr("ui.filesLoaded"), 'success', 1800); }
         } catch (e) {
             console.error(e);
-            setStatus('Error');
+            setStatus(tr("ui.error"));
             el.list.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon"><i class="fas fa-exclamation-triangle"></i></div>
-          <div class="empty-state-title">Failed to load</div>
+          <div class="empty-state-title">${tr("ui.failedToLoad")}</div>
           <div class="empty-state-text">${e.message}</div>
           <button class="btn btn-primary btn-small" style="margin-top:20px;flex:none;" onclick="window.location.reload()">
-            <i class="fas fa-sync-alt"></i> Try again
+            <i class="fas fa-sync-alt"></i> ${tr("ui.tryAgain")}
           </button>
         </div>`;
         } finally {
@@ -200,15 +429,15 @@
             el.list.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon"><i class="fas fa-folder-open"></i></div>
-          <div class="empty-state-title">No files here</div>
-          <div class="empty-state-text">Send files to the bot to see them here</div>
+          <div class="empty-state-title">${tr("ui.noFiles")}</div>
+          <div class="empty-state-text">${tr("ui.noFilesText")}</div>
         </div>`;
             return;
         }
 
         el.list.innerHTML = items.map((item, idx) => {
             const type = getFileType(item.fileName, item.kind);
-            const date = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const date = formatDate(item.createdAt);
             const safeName = String(item.fileName || 'Unnamed').replace(/[<>"]/g, c => ({ '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
             const fileData = JSON.stringify(item).replace(/'/g, "&#39;");
             const preview = canPreview(item);
@@ -230,8 +459,8 @@
               </div>
             </div>
             <div class="file-actions">
-              ${preview ? `<button class="icon-btn" data-action-preview="${item.id}" title="Preview"><i class="fas fa-eye"></i></button>` : ''}
-              <button class="icon-btn primary" data-action-send="${item.id}" title="Send"><i class="fas fa-paper-plane"></i></button>
+              ${preview ? `<button class="icon-btn" data-action-preview="${item.id}" title="${tr("ui.preview")}"><i class="fas fa-eye"></i></button>` : ''}
+              <button class="icon-btn primary" data-action-send="${item.id}" title="${tr("ui.sendViaBot")}"><i class="fas fa-paper-plane"></i></button>
             </div>
           </div>
           ${item.note ? `<div class="file-note"><i class="fas fa-sticky-note"></i>${item.note}</div>` : ''}
@@ -243,27 +472,22 @@
 
     function attachFileListeners() {
         el.list.querySelectorAll('.file-card').forEach(card => {
-            // Preview button
             const pBtn = card.querySelector('[data-action-preview]');
             if (pBtn) {
                 pBtn.addEventListener('click', e => {
                     e.stopPropagation();
-                    const id = pBtn.dataset.actionPreview;
-                    const file = state.filesData.find(f => f.id === id);
+                    const file = state.filesData.find(f => f.id === pBtn.dataset.actionPreview);
                     if (file) openPreview(file);
                 });
             }
-            // Send button
             const sBtn = card.querySelector('[data-action-send]');
             if (sBtn) {
                 sBtn.addEventListener('click', e => {
                     e.stopPropagation();
-                    const id = sBtn.dataset.actionSend;
-                    const file = state.filesData.find(f => f.id === id);
-                    if (file) sendViaBot(id, file.fileName);
+                    const file = state.filesData.find(f => f.id === sBtn.dataset.actionSend);
+                    if (file) sendViaBot(file.id, file.fileName);
                 });
             }
-            // Click card → open modal
             card.addEventListener('click', e => {
                 if (e.target.closest('[data-action-preview]') || e.target.closest('[data-action-send]')) return;
                 try {
@@ -271,7 +495,6 @@
                     openModal(file);
                 } catch { }
             });
-            // Long press
             card.addEventListener('touchstart', e => {
                 state.longPressTimeout = setTimeout(() => {
                     try {
@@ -305,9 +528,7 @@
         tg?.HapticFeedback?.impactOccurred('medium');
     }
 
-    function hideContextMenu() {
-        el.contextMenu.classList.remove('show');
-    }
+    function hideContextMenu() { el.contextMenu.classList.remove('show'); }
 
     el.contextMenu.addEventListener('click', e => {
         const action = e.target.closest('.context-item')?.dataset.action;
@@ -321,12 +542,12 @@
     // ===== SEND VIA BOT =====
     async function sendViaBot(id, name) {
         try {
-            showToast('Sending...', 'info', 1500);
+            showToast(tr("ui.sending"), 'info', 1500);
             const r = await api(`/api/files/${id}/send`, { method: 'POST' });
-            if (r.ok) { showToast('Sent ✓', 'success'); tg?.HapticFeedback?.notificationOccurred('success'); }
+            if (r.ok) { showToast(tr("ui.sent"), 'success'); tg?.HapticFeedback?.notificationOccurred('success'); }
             else throw new Error(r.error || 'Failed');
         } catch (e) {
-            showToast('Failed to send', 'error');
+            showToast(tr("ui.failedToSend"), 'error');
             tg?.HapticFeedback?.notificationOccurred('error');
         }
     }
@@ -337,11 +558,11 @@
         el.mName.value = item.fileName || '';
         el.mNote.value = item.note || '';
         el.errorSuggestion.style.display = 'none';
-        const date = new Date(item.createdAt).toLocaleString(undefined, { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        const date = formatDateLong(item.createdAt);
         el.mMeta.innerHTML = `
-      <div class="meta-item"><span class="meta-label"><i class="fas fa-tag"></i>Type</span><span class="meta-value">${item.kind || 'Unknown'}</span></div>
-      <div class="meta-item"><span class="meta-label"><i class="fas fa-database"></i>Size</span><span class="meta-value">${formatSize(item.fileSize)}</span></div>
-      <div class="meta-item"><span class="meta-label"><i class="fas fa-calendar"></i>Created</span><span class="meta-value">${date}</span></div>`;
+      <div class="meta-item"><span class="meta-label"><i class="fas fa-tag"></i>${tr("ui.type")}</span><span class="meta-value">${item.kind || 'Unknown'}</span></div>
+      <div class="meta-item"><span class="meta-label"><i class="fas fa-database"></i>${tr("ui.size")}</span><span class="meta-value">${formatSize(item.fileSize)}</span></div>
+      <div class="meta-item"><span class="meta-label"><i class="fas fa-calendar"></i>${tr("ui.created")}</span><span class="meta-value">${date}</span></div>`;
         el.modal.classList.add('show');
         document.body.style.overflow = 'hidden';
     }
@@ -356,22 +577,21 @@
     async function saveFileChanges(id, fileName, note) {
         try {
             el.saveChanges.disabled = true;
-            el.saveChanges.innerHTML = '<span class="spinner"></span> Saving...';
+            el.saveChanges.innerHTML = `<span class="spinner"></span> ${tr("ui.saving")}`;
             const r = await api(`/api/files/${id}`, { method: 'PATCH', body: JSON.stringify({ fileName, note }) });
             if (r.ok) {
-                showToast('Saved ✓', 'success');
+                showToast(tr("ui.saved"), 'success');
                 tg?.HapticFeedback?.notificationOccurred('success');
-                closeModal();
-                load();
+                closeModal(); load();
             } else throw new Error(r.error || 'Failed');
         } catch (e) {
-            showToast('Failed to save', 'error');
+            showToast(tr("ui.failedToSave"), 'error');
             el.errorSuggestion.style.display = 'flex';
             el.errorMessage.textContent = e.message;
             tg?.HapticFeedback?.notificationOccurred('error');
         } finally {
             el.saveChanges.disabled = false;
-            el.saveChanges.innerHTML = '<i class="fas fa-save"></i> Save changes';
+            el.saveChanges.innerHTML = `<i class="fas fa-save"></i> ${tr("ui.save")}`;
         }
     }
 
@@ -381,10 +601,9 @@
         const type = getFileType(file.fileName, file.kind);
         const previewUrl = `/api/files/${file.id}/preview?initData=${encodeURIComponent(initData)}`;
 
-        if (el.previewTitle) el.previewTitle.textContent = file.fileName || 'Preview';
+        if (el.previewTitle) el.previewTitle.textContent = file.fileName || tr("ui.preview");
 
         if (type.category === 'audio') {
-            // Build music player
             const audioFiles = state.filesData.filter(f => getFileType(f.fileName, f.kind).category === 'audio');
             const idx = audioFiles.findIndex(f => f.id === file.id);
             buildMusicPlayer(audioFiles, Math.max(0, idx));
@@ -400,21 +619,10 @@
     }
 
     function closePreview() {
-        // Destroy audio
-        if (state.mp.audio) {
-            state.mp.audio.pause();
-            state.mp.audio.src = '';
-            state.mp.audio = null;
-        }
+        if (state.mp.audio) { state.mp.audio.pause(); state.mp.audio.src = ''; state.mp.audio = null; }
         if (state.mp.progressInterval) { clearInterval(state.mp.progressInterval); state.mp.progressInterval = null; }
-        // Destroy video
-        if (state.vp.video) {
-            state.vp.video.pause();
-            state.vp.video.src = '';
-            state.vp.video = null;
-        }
+        if (state.vp.video) { state.vp.video.pause(); state.vp.video.src = ''; state.vp.video = null; }
         clearTimeout(state.vp.hideTimeout);
-
         el.previewModal.classList.remove('show');
         el.previewBody.innerHTML = '';
         document.body.style.overflow = '';
@@ -426,10 +634,10 @@
     function buildImageViewer(file, url) {
         el.previewBody.innerHTML = `
       <div class="img-preview-wrap">
-        <img src="${url}" alt="${file.fileName || 'Image'}" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display='flex'">
+        <img src="${url}" alt="${file.fileName || tr("ui.preview")}" loading="lazy" onerror="this.style.display='none';this.nextSibling.style.display='flex'">
         <div style="display:none;flex-direction:column;align-items:center;gap:12px;color:var(--text3);">
           <i class="fas fa-image" style="font-size:48px"></i>
-          <span>Failed to load image</span>
+          <span>${tr("ui.failedToLoad")}</span>
         </div>
       </div>`;
     }
@@ -451,11 +659,10 @@
               </div>
             </div>
             <div class="mp-track-info">
-              <div class="mp-title" id="mpTitle">Loading...</div>
+              <div class="mp-title" id="mpTitle">${tr("ui.loading")}...</div>
               <div class="mp-subtitle" id="mpSubtitle">AUDIO</div>
             </div>
           </div>
-
           <div class="mp-progress-section">
             <div class="mp-time-row">
               <span id="mpCurrent">0:00</span>
@@ -465,23 +672,20 @@
               <div class="mp-progress-fill" id="mpProgressFill" style="width:0%"></div>
             </div>
           </div>
-
           <div class="mp-controls">
-            <button class="mp-btn mp-btn-sm" id="mpPrev" title="Previous"><i class="fas fa-backward-step"></i></button>
-            <button class="mp-btn mp-btn-lg" id="mpPlay" title="Play/Pause"><i class="fas fa-play" id="mpPlayIcon"></i></button>
-            <button class="mp-btn mp-btn-sm" id="mpNext" title="Next"><i class="fas fa-forward-step"></i></button>
+            <button class="mp-btn mp-btn-sm" id="mpPrev"><i class="fas fa-backward-step"></i></button>
+            <button class="mp-btn mp-btn-lg" id="mpPlay"><i class="fas fa-play" id="mpPlayIcon"></i></button>
+            <button class="mp-btn mp-btn-sm" id="mpNext"><i class="fas fa-forward-step"></i></button>
           </div>
-
           <div class="mp-extra-row">
             <i class="fas fa-volume-low mp-vol-icon"></i>
             <input type="range" class="mp-volume" id="mpVolume" min="0" max="1" step="0.01" value="1">
-            <button class="mp-option-btn" id="mpShuffle" title="Shuffle"><i class="fas fa-shuffle"></i></button>
-            <button class="mp-option-btn" id="mpRepeat" title="Repeat"><i class="fas fa-repeat"></i></button>
+            <button class="mp-option-btn" id="mpShuffle"><i class="fas fa-shuffle"></i></button>
+            <button class="mp-option-btn" id="mpRepeat"><i class="fas fa-repeat"></i></button>
           </div>
-
           ${playlist.length > 1 ? `
           <div class="mp-playlist">
-            <div class="mp-playlist-title">Playlist · ${playlist.length} tracks</div>
+            <div class="mp-playlist-title">${tr("ui.playlist")} · ${playlist.length} ${tr("ui.tracks")}</div>
             <div id="mpPlaylistItems"></div>
           </div>` : ''}
         </div>
@@ -518,20 +722,15 @@
             mpTotal.textContent = '0:00';
             mpProgressFill.style.width = '0%';
 
-            p.audio.addEventListener('loadedmetadata', () => {
-                mpTotal.textContent = formatTime(p.audio.duration);
-            });
-
+            p.audio.addEventListener('loadedmetadata', () => { mpTotal.textContent = formatTime(p.audio.duration); });
             p.audio.addEventListener('ended', () => {
                 if (p.isRepeat) { p.audio.currentTime = 0; p.audio.play(); }
                 else if (p.isShuffle) { loadTrack(Math.floor(Math.random() * p.playlist.length)); autoPlay(); }
                 else if (p.currentIdx < p.playlist.length - 1) { loadTrack(p.currentIdx + 1); autoPlay(); }
                 else { p.isPlaying = false; updatePlayUI(); mpArt.className = 'mp-art paused'; }
             });
+            p.audio.addEventListener('error', () => showToast(tr("ui.cannotPlay"), 'error'));
 
-            p.audio.addEventListener('error', () => showToast('Cannot play this file', 'error'));
-
-            // Progress interval
             p.progressInterval = setInterval(() => {
                 if (p.audio && !p.audio.paused && p.audio.duration) {
                     const pct = (p.audio.currentTime / p.audio.duration) * 100;
@@ -547,9 +746,7 @@
             setTimeout(() => { if (p.audio) { p.audio.play().catch(() => { }); p.isPlaying = true; updatePlayUI(); mpArt.className = 'mp-art playing'; } }, 100);
         }
 
-        function updatePlayUI() {
-            mpPlayIcon.className = p.isPlaying ? 'fas fa-pause' : 'fas fa-play';
-        }
+        function updatePlayUI() { mpPlayIcon.className = p.isPlaying ? 'fas fa-pause' : 'fas fa-play'; }
 
         function updatePlaylistUI() {
             const container = $('mpPlaylistItems');
@@ -570,49 +767,43 @@
 
             container.querySelectorAll('.mp-pl-item').forEach(item => {
                 item.addEventListener('click', () => {
-                    const idx = parseInt(item.dataset.plIdx);
-                    loadTrack(idx);
+                    loadTrack(parseInt(item.dataset.plIdx));
                     autoPlay();
                 });
             });
         }
 
-        // Seek
         mpProgressBar.addEventListener('click', e => {
             if (!p.audio) return;
             const rect = mpProgressBar.getBoundingClientRect();
             const pct = (e.clientX - rect.left) / rect.width;
-            if (p.audio.duration) { p.audio.currentTime = pct * p.audio.duration; }
+            if (p.audio.duration) p.audio.currentTime = pct * p.audio.duration;
         });
 
-        // Touch seek
         mpProgressBar.addEventListener('touchstart', e => {
             if (!p.audio) return;
             const rect = mpProgressBar.getBoundingClientRect();
             const pct = (e.touches[0].clientX - rect.left) / rect.width;
-            if (p.audio.duration) { p.audio.currentTime = Math.max(0, Math.min(1, pct)) * p.audio.duration; }
+            if (p.audio.duration) p.audio.currentTime = Math.max(0, Math.min(1, pct)) * p.audio.duration;
         }, { passive: true });
 
-        // Play/Pause
         mpPlay.addEventListener('click', () => {
             if (!p.audio) return;
             if (p.isPlaying) { p.audio.pause(); p.isPlaying = false; mpArt.className = 'mp-art paused'; }
-            else { p.audio.play().catch(() => showToast('Playback failed', 'error')); p.isPlaying = true; mpArt.className = 'mp-art playing'; }
+            else { p.audio.play().catch(() => showToast(tr("ui.playbackFailed"), 'error')); p.isPlaying = true; mpArt.className = 'mp-art playing'; }
             updatePlayUI();
             tg?.HapticFeedback?.impactOccurred('light');
         });
 
         mpPrev.addEventListener('click', () => {
             const prev = p.isShuffle ? Math.floor(Math.random() * p.playlist.length) : Math.max(0, p.currentIdx - 1);
-            loadTrack(prev);
-            if (p.isPlaying) autoPlay();
+            loadTrack(prev); if (p.isPlaying) autoPlay();
             tg?.HapticFeedback?.impactOccurred('light');
         });
 
         mpNext.addEventListener('click', () => {
             const next = p.isShuffle ? Math.floor(Math.random() * p.playlist.length) : Math.min(p.playlist.length - 1, p.currentIdx + 1);
-            loadTrack(next);
-            if (p.isPlaying) autoPlay();
+            loadTrack(next); if (p.isPlaying) autoPlay();
             tg?.HapticFeedback?.impactOccurred('light');
         });
 
@@ -630,7 +821,6 @@
             tg?.HapticFeedback?.impactOccurred('light');
         });
 
-        // Load and auto play
         loadTrack(p.currentIdx);
         autoPlay();
     }
@@ -641,10 +831,7 @@
         el.previewBody.innerHTML = `
       <div id="vpWrap" style="width:100%;height:100%;display:flex;flex-direction:column;background:#000;position:relative;overflow:hidden;">
         <div id="vpMain" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;overflow:hidden;">
-          <video id="vpVideo"
-            playsinline
-            webkit-playsinline
-            preload="auto"
+          <video id="vpVideo" playsinline webkit-playsinline preload="auto"
             style="width:100%;height:100%;object-fit:contain;display:block;background:#000;">
             <source src="${url}" type="video/mp4">
             <source src="${url}">
@@ -676,13 +863,11 @@
           </div>
         </div>
       </div>`;
-
         initVideoPlayer(file);
     }
 
     function initVideoPlayer(file) {
-        const wrap = $('vpWrap'), vid = $('vpVideo'), overlay = $('vpOverlay');
-        const vpMain = $('vpMain');
+        const vid = $('vpVideo'), overlay = $('vpOverlay'), vpMain = $('vpMain');
         if (!vid) return;
         state.vp.video = vid;
 
@@ -692,7 +877,6 @@
         const vpCurrent = $('vpCurrent'), vpTotal = $('vpTotal'), vpSeekbar = $('vpSeekbar');
         const vpFullscreen = $('vpFullscreen'), vpFsIcon = $('vpFsIcon');
         const vpResInfo = $('vpResInfo');
-
         let controlsTimer = null;
 
         function showControls() {
@@ -701,40 +885,24 @@
             controlsTimer = setTimeout(() => { if (!vid.paused) overlay.style.opacity = '0'; }, 3500);
         }
 
-        function hideControls() {
-            if (!vid.paused) overlay.style.opacity = '0';
-        }
-
-        function updatePlayUI() {
-            vpPlayIcon.className = vid.paused ? 'fas fa-play' : 'fas fa-pause';
-        }
+        function updatePlayUI() { vpPlayIcon.className = vid.paused ? 'fas fa-play' : 'fas fa-pause'; }
 
         vid.addEventListener('loadedmetadata', () => {
             vpTotal.textContent = formatTime(vid.duration);
-            vpSeekbar.max = 1000;
-            if (vid.videoWidth && vid.videoHeight) {
-                vpResInfo.textContent = vid.videoWidth + 'x' + vid.videoHeight;
-            }
+            if (vid.videoWidth && vid.videoHeight) vpResInfo.textContent = vid.videoWidth + 'x' + vid.videoHeight;
         });
-
         vid.addEventListener('timeupdate', () => {
             vpCurrent.textContent = formatTime(vid.currentTime);
             if (vid.duration) vpSeekbar.value = (vid.currentTime / vid.duration) * 1000;
         });
-
         vid.addEventListener('ended', () => { updatePlayUI(); overlay.style.opacity = '1'; clearTimeout(controlsTimer); });
-        vid.addEventListener('error', e => {
-            console.error('Video error:', e);
-            showToast('Cannot play this video', 'error');
-        });
+        vid.addEventListener('error', () => showToast(tr("ui.cannotPlayVideo"), 'error'));
         vid.addEventListener('play', updatePlayUI);
         vid.addEventListener('pause', () => { updatePlayUI(); overlay.style.opacity = '1'; clearTimeout(controlsTimer); });
-        vid.addEventListener('waiting', () => { /* buffering */ });
-        vid.addEventListener('canplay', () => { /* ready */ });
 
         vpPlay.addEventListener('click', e => {
             e.stopPropagation();
-            if (vid.paused) vid.play().catch(err => { console.error(err); showToast('Playback failed - try sending via bot', 'error'); });
+            if (vid.paused) vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
             else vid.pause();
             showControls();
         });
@@ -759,9 +927,8 @@
 
         vpFullscreen.addEventListener('click', e => {
             e.stopPropagation();
-            const fsEl = vpMain;
             if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                (fsEl.requestFullscreen?.() || fsEl.webkitRequestFullscreen?.() || vid.webkitEnterFullscreen?.());
+                (vpMain.requestFullscreen?.() || vpMain.webkitRequestFullscreen?.() || vid.webkitEnterFullscreen?.());
                 vpFsIcon.className = 'fas fa-compress';
             } else {
                 (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
@@ -769,50 +936,28 @@
             }
         });
 
-        document.addEventListener('fullscreenchange', () => {
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                vpFsIcon.className = 'fas fa-expand';
-            }
-        });
-        document.addEventListener('webkitfullscreenchange', () => {
-            if (!document.webkitFullscreenElement) vpFsIcon.className = 'fas fa-expand';
-        });
+        document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) vpFsIcon.className = 'fas fa-expand'; });
+        document.addEventListener('webkitfullscreenchange', () => { if (!document.webkitFullscreenElement) vpFsIcon.className = 'fas fa-expand'; });
 
-        vpMain.addEventListener('click', e => {
-            if (e.target.closest('button') || e.target.closest('input')) return;
-            showControls();
-        });
-
-        vpMain.addEventListener('touchstart', e => {
-            if (e.target.closest('button') || e.target.closest('input')) return;
-            showControls();
-        }, { passive: true });
-
+        vpMain.addEventListener('click', e => { if (e.target.closest('button') || e.target.closest('input')) return; showControls(); });
+        vpMain.addEventListener('touchstart', e => { if (e.target.closest('button') || e.target.closest('input')) return; showControls(); }, { passive: true });
         overlay.addEventListener('click', e => e.stopPropagation());
 
-        // Auto play with retry
         showControls();
         const playPromise = vid.play();
-        if (playPromise !== undefined) {
-            playPromise.catch(err => {
-                console.warn('Autoplay blocked:', err);
-                updatePlayUI();
-                overlay.style.opacity = '1';
-            });
-        }
+        if (playPromise !== undefined) playPromise.catch(() => { updatePlayUI(); overlay.style.opacity = '1'; });
     }
 
     // ===== MODAL EVENTS =====
     el.close.addEventListener('click', closeModal);
     el.previewClose.addEventListener('click', closePreview);
-
     el.modal.addEventListener('click', e => { if (e.target === el.modal) closeModal(); });
     el.previewModal.addEventListener('click', e => { if (e.target === el.previewModal) closePreview(); });
 
     el.saveChanges.addEventListener('click', () => {
         if (!state.currentId) return;
         const name = el.mName.value.trim();
-        if (!name) { showToast('File name cannot be empty', 'error'); return; }
+        if (!name) { showToast(tr("ui.fileNameEmpty"), 'error'); return; }
         saveFileChanges(state.currentId, name, el.mNote.value.trim());
     });
 
@@ -847,7 +992,7 @@
 
     el.sortBtn.addEventListener('click', () => {
         state.sortOrder = state.sortOrder === 'desc' ? 'asc' : 'desc';
-        el.sortText.textContent = state.sortOrder === 'desc' ? 'Latest' : 'Oldest';
+        el.sortText.textContent = tr(state.sortOrder === 'desc' ? 'ui.latest' : 'ui.oldest');
         filterAndRenderFiles();
         tg?.HapticFeedback?.impactOccurred('light');
     });
@@ -858,7 +1003,6 @@
             else if (el.modal.classList.contains('show')) closeModal();
             else if (el.contextMenu.classList.contains('show')) hideContextMenu();
         }
-        // Space to toggle music playback when player open
         if (e.key === ' ' && el.previewModal.classList.contains('show') && state.mp.audio) {
             e.preventDefault();
             if (state.mp.isPlaying) { state.mp.audio.pause(); state.mp.isPlaying = false; }
@@ -870,7 +1014,6 @@
         }
     });
 
-    // Global handlers (for backward compat if needed)
     window.previewFileHandler = id => { const f = state.filesData.find(f => f.id === id); if (f) openPreview(f); };
     window.sendFileHandler = id => { const f = state.filesData.find(f => f.id === id); if (f) sendViaBot(id, f.fileName); };
 
