@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Gallery - Cloud Storage</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/public/gallery.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header with User Info -->
+        <header class="gallery-header">
+            <div class="header-left">
+                <button class="back-btn" onclick="goBack()">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <h1 class="gallery-title">Gallery</h1>
+            </div>
+            <div class="user-avatar-wrap">
+                <img id="userAvatar" src="" alt="User" class="user-avatar">
+                <div class="user-status online"></div>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="gallery-stats">
+            <div class="stat-item">
+                <i class="fas fa-images"></i>
+                <span id="totalImages">0</span>
+                <span class="stat-label">photos</span>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-database"></i>
+                <span id="totalSize">0 MB</span>
+                <span class="stat-label">used</span>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-calendar"></i>
+                <span id="lastUpdated">-</span>
+                <span class="stat-label">updated</span>
+            </div>
+        </div>
+
+        <!-- Gallery Grid -->
+        <div class="gallery-grid" id="galleryGrid">
+            <!-- Images will be loaded here -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <i class="fas fa-images empty-icon"></i>
+            <h3>No Photos Yet</h3>
+            <p>Send images to the bot to see them here</p>
+            <button class="btn-primary" onclick="goToMain()">
+                <i class="fas fa-home"></i> Go to Main
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-state" id="loadingState">
+            <div class="spinner-large"></div>
+            <p>Loading gallery...</p>
+        </div>
+
+        <!-- Lightbox Modal -->
+        <div class="lightbox" id="lightbox">
+            <div class="lightbox-overlay" onclick="closeLightbox()"></div>
+            <div class="lightbox-content">
+                <button class="lightbox-close" onclick="closeLightbox()">
+                    <i class="fas fa-times"></i>
+                </button>
+                <button class="lightbox-nav prev" onclick="navigateLightbox(-1)">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <img id="lightboxImage" src="" alt="">
+                <button class="lightbox-nav next" onclick="navigateLightbox(1)">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+                <div class="lightbox-info">
+                    <span id="lightboxFilename"></span>
+                    <span id="lightboxDate"></span>
+                </div>
+                <div class="lightbox-actions">
+                    <button class="action-btn" onclick="downloadCurrent()">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                    <button class="action-btn" onclick="sendCurrent()">
+                        <i class="fas fa-share"></i> Send
+                    </button>
+                    <button class="action-btn delete" onclick="deleteCurrent()">
+                        <i class="fas fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toast Notification -->
+        <div class="toast" id="toast">
+            <i class="fas fa-check-circle"></i>
+            <span id="toastMessage">Message</span>
+        </div>
+    </div>
+
+    <script src="/public/gallery.js"></script>
+</body>
+
+</html>

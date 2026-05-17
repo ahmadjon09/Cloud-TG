@@ -201,6 +201,9 @@
     "langs": {
         "en": "English",
         "uz": "O'zbek",
-        "ru": "Русский"
+        "ru": "Русский",
+        "ch": "中文",
+        "es": "Español",
+        "fr": "Français"
     }
 }

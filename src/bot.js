@@ -150,7 +150,7 @@ const isAdmin = (id) =>
 const webAppUrl = () => {
     const base = process.env.BASE_URL;
     if (!base || !base.startsWith("https://")) return null;
-    return `${base}/app`;
+    return `${base}`;
 };
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -208,22 +208,25 @@ const KB = {
         const appUrl = webAppUrl();
         const tr = await getUserTranslator(uid);
         return Markup.inlineKeyboard([
-            ...(appUrl ? [[Markup.button.webApp(await tr("menu.myFiles"), appUrl)]] : []),
+            ...(appUrl ? [[
+                Markup.button.webApp(`🌐 ${await tr("menu.myFiles")}`, `${appUrl}/app`),
+                Markup.button.webApp(`🌌 Gallery`, `${appUrl}/gallery`)
+            ]] : []),
             [
-                Markup.button.callback(await tr("menu.myFiles"), "MY_FILES"),
-                Markup.button.callback(await tr("menu.search"), "SEARCH_MAIN"),
+                Markup.button.callback(`📁 ${await tr("menu.myFiles")}`, "MY_FILES"),
+                Markup.button.callback(`🔍 ${await tr("menu.search")}`, "SEARCH_MAIN"),
             ],
             [
-                Markup.button.callback(await tr("menu.folders"), "FOLDERS_MAIN"),
-                Markup.button.callback(await tr("menu.expiring"), "EXPIRING_MAIN"),
+                Markup.button.callback(`🗂️ ${await tr("menu.folders")}`, "FOLDERS_MAIN"),
+                Markup.button.callback(`⏰ ${await tr("menu.expiring")}`, "EXPIRING_MAIN"),
             ],
             [
-                Markup.button.callback(await tr("menu.share"), "SHARE_MAIN"),
-                Markup.button.callback(await tr("menu.settings"), "SETTINGS_MAIN"),
+                Markup.button.callback(`🔗 ${await tr("menu.share")}`, "SHARE_MAIN"),
+                Markup.button.callback(`⚙️ ${await tr("menu.settings")}`, "SETTINGS_MAIN"),
             ],
             [
-                Markup.button.callback(await tr("menu.about"), "ABOUT"),
-                Markup.button.callback(await tr("menu.help"), "HELP"),
+                Markup.button.callback(`ℹ️ ${await tr("menu.about")}`, "ABOUT"),
+                Markup.button.callback(`🆘 ${await tr("menu.help")}`, "HELP"),
             ],
         ]);
     },
@@ -233,20 +236,20 @@ const KB = {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         return Markup.inlineKeyboard([
             [
-                Markup.button.callback(`${E.download} ${await tr("files.download")}`, `DL:${fileId}`),
-                Markup.button.callback(`${E.share} ${await tr("menu.share")}`, `SHARE_SELECT:${fileId}`),
+                Markup.button.callback(`📥 ${await tr("files.download")}`, `DL:${fileId}`),
+                Markup.button.callback(`🔗 ${await tr("menu.share")}`, `SHARE_SELECT:${fileId}`),
             ],
             [
-                Markup.button.callback(`${E.rename} ${await tr("files.rename")}`, `RENAME:${fileId}`),
-                Markup.button.callback(`${E.delete} ${await tr("files.delete")}`, `DELETE:${fileId}`),
+                Markup.button.callback(`✏️ ${await tr("files.rename")}`, `RENAME:${fileId}`),
+                Markup.button.callback(`🗑️ ⚠️ ${await tr("files.delete")}`, `DELETE:${fileId}`),
             ],
             [
-                Markup.button.callback(`${E.private} ${await tr("files.togglePrivate")}`, `PRIV:${fileId}`),
-                Markup.button.callback(`${E.expire} ${await tr("files.setExpiry")}`, `EXP:${fileId}`),
+                Markup.button.callback(`🔒 ${await tr("files.togglePrivate")}`, `PRIV:${fileId}`),
+                Markup.button.callback(`⏰ ${await tr("files.setExpiry")}`, `EXP:${fileId}`),
             ],
             [
-                Markup.button.callback(`${E.move} ${await tr("files.move")}`, `MOVE:${fileId}`),
-                Markup.button.callback(`${E.back} ${await tr("files.back")}`, "MY_FILES"),
+                Markup.button.callback(`📂 ${await tr("files.move")}`, `MOVE:${fileId}`),
+                Markup.button.callback(`↩️ ${await tr("files.back")}`, "MY_FILES"),
             ],
         ]);
     },
@@ -255,10 +258,10 @@ const KB = {
     folders: async (uid) => {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         return Markup.inlineKeyboard([
-            [Markup.button.callback(`${E.new} ${await tr("folders.newFolder")}`, "FOLDER_CREATE")],
-            [Markup.button.callback(`${E.folder} ${await tr("folders.viewAll")}`, "FOLDER_LIST")],
-            [Markup.button.callback(`${E.move} ${await tr("folders.moveFiles")}`, "FOLDER_MOVE_SELECT")],
-            [Markup.button.callback(`${E.back} ${await tr("files.back")}`, "MAIN")],
+            [Markup.button.callback(`➕ ${await tr("folders.newFolder")}`, "FOLDER_CREATE")],
+            [Markup.button.callback(`📂 ${await tr("folders.viewAll")}`, "FOLDER_LIST")],
+            [Markup.button.callback(`📤 ${await tr("folders.moveFiles")}`, "FOLDER_MOVE_SELECT")],
+            [Markup.button.callback(`↩️ ${await tr("files.back")}`, "MAIN")],
         ]);
     },
 
@@ -266,18 +269,18 @@ const KB = {
     search: async (uid) => {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         return Markup.inlineKeyboard([
-            [{ text: `${E.search} ${await tr("menu.search")}...`, switch_inline_query_current_chat: "" }],
+            [{ text: `🔍 ${await tr("menu.search")}...`, switch_inline_query_current_chat: "" }],
             [
-                Markup.button.callback(await tr("search.docs"), "SRCH:document"),
-                Markup.button.callback(await tr("search.photos"), "SRCH:photo"),
+                Markup.button.callback(`📄 ${await tr("search.docs")}`, "SRCH:document"),
+                Markup.button.callback(`🖼️ ${await tr("search.photos")}`, "SRCH:photo"),
             ],
             [
-                Markup.button.callback(await tr("search.video"), "SRCH:video"),
-                Markup.button.callback(await tr("search.audio"), "SRCH:audio"),
+                Markup.button.callback(`🎬 ${await tr("search.video")}`, "SRCH:video"),
+                Markup.button.callback(`🎵 ${await tr("search.audio")}`, "SRCH:audio"),
             ],
             [
-                Markup.button.callback(await tr("search.clearFilter"), "SRCH:CLEAR"),
-                Markup.button.callback(`${E.back} ${await tr("files.back")}`, "MAIN"),
+                Markup.button.callback(`🔄 ${await tr("search.clearFilter")}`, "SRCH:CLEAR"),
+                Markup.button.callback(`↩️ ${await tr("files.back")}`, "MAIN"),
             ],
         ]);
     },
@@ -291,21 +294,21 @@ const KB = {
         return Markup.inlineKeyboard([
             [
                 Markup.button.callback(
-                    await tr("settings.notifications", { icon: notifOn ? E.bell : E.mute, status: notifOn ? await tr("common.on") : await tr("common.off") }),
+                    await tr("settings.notifications", { icon: notifOn ? "🔔" : "🔕", status: notifOn ? await tr("common.on") : await tr("common.off") }),
                     `SET:NOTIF:${notifOn ? "off" : "on"}`
                 ),
                 Markup.button.callback(
-                    await tr("settings.privateDefault", { icon: privOn ? E.lock : E.unlock, status: privOn ? await tr("common.on") : await tr("common.off") }),
+                    await tr("settings.privateDefault", { icon: privOn ? "🔒" : "🔓", status: privOn ? await tr("common.on") : await tr("common.off") }),
                     "SET:PRIV:toggle"
                 ),
             ],
-            [Markup.button.callback(await tr("settings.autoExpire"), "SET:EXPIRE:menu")],
-            [Markup.button.callback(await tr("settings.language", { lang: langName }), "SET:LANG:menu")],
+            [Markup.button.callback(`⏰ ${await tr("settings.autoExpire")}`, "SET:EXPIRE:menu")],
+            [Markup.button.callback(`🌐 ${await tr("settings.language", { lang: langName })}`, "SET:LANG:menu")],
             [
-                Markup.button.callback(await tr("settings.clearCache"), "SET:CACHE"),
-                Markup.button.callback(await tr("settings.myStats"), "SET:STATS"),
+                Markup.button.callback(`💾 ${await tr("settings.clearCache")}`, "SET:CACHE"),
+                Markup.button.callback(`📊 ${await tr("settings.myStats")}`, "SET:STATS"),
             ],
-            [Markup.button.callback(`${E.back} ${await tr("files.back")}`, "MAIN")],
+            [Markup.button.callback(`↩️ ${await tr("files.back")}`, "MAIN")],
         ]);
     },
 
@@ -316,9 +319,15 @@ const KB = {
             [
                 Markup.button.callback("🇬🇧 English", "LANG:en"),
                 Markup.button.callback("🇺🇿 O'zbek", "LANG:uz"),
+                Markup.button.callback("🇷🇺 Русский", "LANG:ru"),
+
             ],
-            [Markup.button.callback("🇷🇺 Русский", "LANG:ru")],
-            [Markup.button.callback(`${E.back} ${await tr("files.back")}`, "SETTINGS_MAIN")],
+            [
+                Markup.button.callback("🇨🇳 中文", "LANG:ch"),
+                Markup.button.callback("🇪🇸 Español", "LANG:es"),
+                Markup.button.callback("🇫🇷 Français", "LANG:fr")
+            ],
+            [Markup.button.callback(`↩️ ${await tr("files.back")}`, "SETTINGS_MAIN")],
         ]);
     },
 
@@ -327,16 +336,16 @@ const KB = {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         return Markup.inlineKeyboard([
             [
-                Markup.button.callback(await tr("expiry.24h"), "EXPSET:24h"),
-                Markup.button.callback(await tr("expiry.7d"), "EXPSET:7d"),
+                Markup.button.callback(`🌙 ${await tr("expiry.24h")}`, "EXPSET:24h"),
+                Markup.button.callback(`📅 ${await tr("expiry.7d")}`, "EXPSET:7d"),
             ],
             [
-                Markup.button.callback(await tr("expiry.30d"), "EXPSET:30d"),
-                Markup.button.callback(await tr("expiry.90d"), "EXPSET:90d"),
+                Markup.button.callback(`🗓️ ${await tr("expiry.30d")}`, "EXPSET:30d"),
+                Markup.button.callback(`📆 ${await tr("expiry.90d")}`, "EXPSET:90d"),
             ],
             [
-                Markup.button.callback(await tr("expiry.none"), "EXPSET:none"),
-                Markup.button.callback(await tr("expiry.cancel"), "CANCEL_ACTION"),
+                Markup.button.callback(`♾️ ${await tr("expiry.none")}`, "EXPSET:none"),
+                Markup.button.callback(`🚫 ${await tr("expiry.cancel")}`, "CANCEL_ACTION"),
             ],
         ]);
     },
@@ -346,16 +355,16 @@ const KB = {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         return Markup.inlineKeyboard([
             [
-                Markup.button.callback(await tr("expiry.24h"), "FILE_EXPSET:24h"),
-                Markup.button.callback(await tr("expiry.7d"), "FILE_EXPSET:7d"),
+                Markup.button.callback(`🌙 ${await tr("expiry.24h")}`, "FILE_EXPSET:24h"),
+                Markup.button.callback(`📅 ${await tr("expiry.7d")}`, "FILE_EXPSET:7d"),
             ],
             [
-                Markup.button.callback(await tr("expiry.30d"), "FILE_EXPSET:30d"),
-                Markup.button.callback(await tr("expiry.90d"), "FILE_EXPSET:90d"),
+                Markup.button.callback(`🗓️ ${await tr("expiry.30d")}`, "FILE_EXPSET:30d"),
+                Markup.button.callback(`📆 ${await tr("expiry.90d")}`, "FILE_EXPSET:90d"),
             ],
             [
-                Markup.button.callback(await tr("expiry.none"), "FILE_EXPSET:none"),
-                Markup.button.callback(await tr("expiry.cancel"), "CANCEL_ACTION"),
+                Markup.button.callback(`♾️ ${await tr("expiry.none")}`, "FILE_EXPSET:none"),
+                Markup.button.callback(`🚫 ${await tr("expiry.cancel")}`, "CANCEL_ACTION"),
             ],
         ]);
     },
@@ -364,8 +373,17 @@ const KB = {
     confirm: async (action, id, uid) => {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         return Markup.inlineKeyboard([
-            [Markup.button.callback(await tr("common.confirm"), `CONFIRM:${action}:${id}`)],
-            [Markup.button.callback(await tr("expiry.cancel"), "CANCEL_ACTION")],
+            [Markup.button.callback(`✅ ${await tr("common.confirm")}`, `CONFIRM:${action}:${id}`)],
+            [Markup.button.callback(`🚫 ${await tr("expiry.cancel")}`, "CANCEL_ACTION")],
+        ]);
+    },
+
+    // 🗑️ DELETE CONFIRM — danger style
+    deleteConfirm: async (fileId, uid) => {
+        const tr = uid ? await getUserTranslator(uid) : async (k) => k;
+        return Markup.inlineKeyboard([
+            [Markup.button.callback(`🗑️ ⚠️ Ha, o'chirilsin!`, `CONFIRM:delete:${fileId}`)],
+            [Markup.button.callback(`🚫 Yo'q, bekor qil`, "CANCEL_ACTION")],
         ]);
     },
 
@@ -374,16 +392,16 @@ const KB = {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         return Markup.inlineKeyboard([
             [
-                Markup.button.callback(`${E.stats} ${await tr("admin.stats")}`, "ADM:STATS"),
-                Markup.button.callback(`${E.broadcast} ${await tr("admin.broadcast")}`, "ADM:BROADCAST"),
+                Markup.button.callback(`📊 ${await tr("admin.stats")}`, "ADM:STATS"),
+                Markup.button.callback(`📢 ${await tr("admin.broadcast")}`, "ADM:BROADCAST"),
             ],
             [
-                Markup.button.callback(`${E.cleanup} ${await tr("admin.cleanup")}`, "ADM:CLEANUP"),
-                Markup.button.callback(`${E.users} ${await tr("admin.users")}`, "ADM:USERS"),
+                Markup.button.callback(`🧹 ${await tr("admin.cleanup")}`, "ADM:CLEANUP"),
+                Markup.button.callback(`👥 ${await tr("admin.users")}`, "ADM:USERS"),
             ],
             [
-                Markup.button.callback(`${E.cache} ${await tr("admin.cache")}`, "ADM:CACHE"),
-                Markup.button.callback(`${E.back} ${await tr("files.back")}`, "MAIN"),
+                Markup.button.callback(`💾 ${await tr("admin.cache")}`, "ADM:CACHE"),
+                Markup.button.callback(`↩️ ${await tr("files.back")}`, "MAIN"),
             ],
         ]);
     },
@@ -392,11 +410,11 @@ const KB = {
     pagination: async (page, hasMore, baseAction, uid) => {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         const nav = [];
-        if (page > 0) nav.push(Markup.button.callback(await tr("common.prev"), `${baseAction}:${page - 1}`));
-        if (hasMore) nav.push(Markup.button.callback(await tr("common.next"), `${baseAction}:${page + 1}`));
+        if (page > 0) nav.push(Markup.button.callback(`◀️ ${await tr("common.prev")}`, `${baseAction}:${page - 1}`));
+        if (hasMore) nav.push(Markup.button.callback(`▶️ ${await tr("common.next")}`, `${baseAction}:${page + 1}`));
         const rows = [];
         if (nav.length) rows.push(nav);
-        rows.push([Markup.button.callback(`${E.back} ${await tr("files.back")}`, "MAIN")]);
+        rows.push([Markup.button.callback(`↩️ ${await tr("files.back")}`, "MAIN")]);
         return Markup.inlineKeyboard(rows);
     },
 };
@@ -716,8 +734,10 @@ export async function startBot() {
 
     try {
         await bot.telegram.setMyCommands([
-            { command: "start", description: "🚀 Start bot" },
-            { command: "help", description: "🆘 Get help" },
+            { command: "start", description: "🚀 Botni ishga tushirish" },
+            { command: "help", description: "🆘 Yordam olish" },
+            { command: "f", description: "📤 Faylni yuborish: /f fayl_nomi" },
+            { command: "d", description: "🗑️ Faylni o'chirish: /d fayl_nomi" },
         ]);
     } catch (e) {
         console.warn("⚠️ Could not set bot commands:", e.message);
@@ -793,6 +813,86 @@ ${await tr("help.tip")}
 
     // ========== INLINE ==========
     bot.on("inline_query", handleInline);
+
+    // ========== /f — FAYLNI YUBORISH ==========
+    bot.command("f", async (ctx) => {
+        const uid = String(ctx.from.id);
+        const tr = await getUserTranslator(uid);
+        const args = ctx.message.text.slice(3).trim(); // "/f " ni olib tashlash
+
+        if (!args) {
+            return ctx.replyWithHTML(
+                `📤 <b>Fayl yuborish</b>\n\nIshlatish: <code>/f fayl_nomi</code>\n\nMisol: <code>/f mening_hujjatim.pdf</code>`,
+                await KB.main(uid)
+            );
+        }
+
+        await withLoading(ctx, async () => {
+            const files = await searchFiles(uid, args, { limit: 5 });
+            if (!files.length) {
+                return ctx.replyWithHTML(
+                    `🔍 <b>"${escapeHtml(args)}"</b> — fayl topilmadi\n\n💡 To'liq fayl nomini yozing`,
+                    await KB.main(uid)
+                );
+            }
+
+            // Eng mos faylni topish (to'liq mos bo'lsa birinchi)
+            const exact = files.find(f => f.fileName.toLowerCase() === args.toLowerCase()) || files[0];
+
+            try {
+                const caption = `📤 <b>${escapeHtml(exact.fileName)}</b>\n\n📦 ${formatFileSize(exact.fileSize)} • ${exact.kind.toUpperCase()}\n🕐 ${formatTime(exact.createdAt)}`;
+                if (exact.kind === "photo") {
+                    await ctx.replyWithPhoto(exact.tgFileId, { caption, parse_mode: "HTML" });
+                } else {
+                    await ctx.replyWithDocument(exact.tgFileId, { caption, parse_mode: "HTML" });
+                }
+
+                // Agar bir nechta natija bo'lsa, qolganlarini ham ko'rsatish
+                if (files.length > 1) {
+                    const others = files.slice(1).map(f => {
+                        const kindEmoji = f.kind === "photo" ? "🖼️" : f.kind === "video" ? "🎬" : f.kind === "audio" ? "🎵" : "📄";
+                        return `${kindEmoji} <code>/f ${escapeHtml(f.fileName)}</code>`;
+                    }).join("\n");
+                    await ctx.replyWithHTML(`🔍 <b>Boshqa mos fayllar:</b>\n\n${others}`);
+                }
+            } catch (e) {
+                console.error("Send file error:", e.message);
+                await ctx.reply(await tr("common.notModified"));
+            }
+        }, "📤 Fayl qidirilmoqda...");
+    });
+
+    // ========== /d — FAYLNI O'CHIRISH ==========
+    bot.command("d", async (ctx) => {
+        const uid = String(ctx.from.id);
+        const tr = await getUserTranslator(uid);
+        const args = ctx.message.text.slice(3).trim(); // "/d " ni olib tashlash
+
+        if (!args) {
+            return ctx.replyWithHTML(
+                `🗑️ <b>Fayl o'chirish</b>\n\nIshlatish: <code>/d fayl_nomi</code>\n\nMisol: <code>/d eski_fayl.pdf</code>`,
+                await KB.main(uid)
+            );
+        }
+
+        await withLoading(ctx, async () => {
+            const files = await searchFiles(uid, args, { limit: 5 });
+            if (!files.length) {
+                return ctx.replyWithHTML(
+                    `🔍 <b>"${escapeHtml(args)}"</b> — fayl topilmadi\n\n💡 To'liq fayl nomini yozing`,
+                    await KB.main(uid)
+                );
+            }
+
+            const exact = files.find(f => f.fileName.toLowerCase() === args.toLowerCase()) || files[0];
+            const kindEmoji = exact.kind === "photo" ? "🖼️" : exact.kind === "video" ? "🎬" : exact.kind === "audio" ? "🎵" : "📄";
+
+            await ctx.replyWithHTML(
+                `⚠️ <b>O'chirishni tasdiqlang!</b>\n\n${kindEmoji} Fayl: <code>${escapeHtml(exact.fileName)}</code>\n📦 ${formatFileSize(exact.fileSize)} • ${exact.kind.toUpperCase()}\n🕐 ${formatTime(exact.createdAt)}\n\n<i>⚠️ Bu amalni bekor qilib bo'lmaydi!</i>`,
+                await KB.deleteConfirm(exact._id.toString(), uid)
+            );
+        }, "🔍 Fayl qidirilmoqda...");
+    });
 
     // ========== MAIN NAV ==========
     bot.action("MAIN", async (ctx) => {
@@ -1179,8 +1279,8 @@ ${await tr("help.tip")}
         const file = await FileModel.findById(ctx.match[1]).lean();
         await safeEdit(
             ctx,
-            await tr("common.deleteConfirm", { name: escapeHtml(file?.fileName || "Unknown") }),
-            await KB.confirm("delete", ctx.match[1], uid)
+            `⚠️ <b>Diqqat! O'chirishni tasdiqlang</b>\n\n🗑️ Fayl: <code>${escapeHtml(file?.fileName || "Unknown")}</code>\n\n<i>Bu amalni bekor qilib bo'lmaydi!</i>`,
+            await KB.deleteConfirm(ctx.match[1], uid)
         );
     });
 
@@ -1520,9 +1620,18 @@ ${topList}`,
             if (!files.length) return ctx.reply(await tr("search.noResults"));
 
             const res = files
-                .map(f => `📄 <code>${escapeHtml(f.fileName)}</code>\n${f.kind.toUpperCase()} • ${formatFileSize(f.fileSize)} • ${formatTime(f.createdAt)}`)
+                .map(f => {
+                    const kindEmoji = f.kind === "photo" ? "🖼️"
+                        : f.kind === "video" ? "🎬"
+                            : f.kind === "audio" ? "🎵"
+                                : f.kind === "voice" ? "🎙️"
+                                    : "📄";
+                    return `${kindEmoji} <code>${escapeHtml(f.fileName)}</code>\n` +
+                        `   ${f.kind.toUpperCase()} • ${formatFileSize(f.fileSize)} • ${formatTime(f.createdAt)}\n` +
+                        `   📤 <code>/f ${escapeHtml(f.fileName)}</code>  🗑️ <code>/d ${escapeHtml(f.fileName)}</code>`;
+                })
                 .join("\n\n");
-            return ctx.replyWithHTML(`${await tr("search.results", { count: files.length })}\n\n${res}`, await KB.main(uid));
+            return ctx.replyWithHTML(`${await tr("search.results", { count: files.length })}\n\n${res}\n\n💡 <i>Faylni olish uchun /f, o'chirish uchun /d yozing</i>`, await KB.main(uid));
         }
 
         // --- PENDING ACTIONS ---

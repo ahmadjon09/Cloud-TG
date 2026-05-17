@@ -195,7 +195,178 @@
                 size: "Размер",
                 created: "Создан",
             }
-        }
+        },
+        ch: {
+            ui: {
+                initializing: "初始化中...",
+                connected: "已连接",
+                demoMode: "演示模式",
+                loading: "加载中...",
+                updated: "已更新",
+                error: "错误",
+                totalFiles: "总文件数",
+                inCloud: "云存储中",
+                storageUsed: "已用存储空间",
+                acrossFiles: "所有文件",
+                categories: "类别",
+                items: "个项目",
+                item: "个项目",
+                all: "全部",
+                images: "图片",
+                documents: "文档",
+                videos: "视频",
+                audio: "音频",
+                archives: "压缩文件",
+                yourFiles: "您的文件",
+                latest: "最新",
+                oldest: "最早",
+                preview: "预览",
+                fileDetails: "文件详情",
+                fileName: "文件名",
+                enterFileName: "请输入文件名",
+                note: "备注",
+                addNote: "添加备注...",
+                save: "保存",
+                send: "发送",
+                sendViaBot: "通过机器人发送",
+                editDetails: "编辑详情",
+                errorOccurred: "发生错误",
+                noFiles: "暂无文件",
+                noFilesText: "向机器人发送文件后即可在此查看",
+                failedToLoad: "加载失败",
+                tryAgain: "重试",
+                sending: "发送中...",
+                sent: "已发送 ✓",
+                failedToSend: "发送失败",
+                saving: "保存中...",
+                saved: "已保存 ✓",
+                failedToSave: "保存失败",
+                filesLoaded: "文件加载完成 ✓",
+                fileNameEmpty: "文件名不能为空",
+                playbackFailed: "播放失败",
+                cannotPlay: "无法播放此文件",
+                cannotPlayVideo: "无法播放此视频",
+                playlist: "播放列表",
+                tracks: "首曲目",
+                type: "类型",
+                size: "大小",
+                created: "创建时间",
+            }
+        },
+        es: {
+            ui: {
+                initializing: "Inicializando...",
+                connected: "Conectado",
+                demoMode: "Modo demo",
+                loading: "Cargando...",
+                updated: "Actualizado",
+                error: "Error",
+                totalFiles: "Total de archivos",
+                inCloud: "en almacenamiento en la nube",
+                storageUsed: "Almacenamiento usado",
+                acrossFiles: "en todos los archivos",
+                categories: "Categorías",
+                items: "elementos",
+                item: "elemento",
+                all: "Todos",
+                images: "Imágenes",
+                documents: "Documentos",
+                videos: "Videos",
+                audio: "Audio",
+                archives: "Archivos comprimidos",
+                yourFiles: "Tus archivos",
+                latest: "Más recientes",
+                oldest: "Más antiguos",
+                preview: "Vista previa",
+                fileDetails: "Detalles del archivo",
+                fileName: "Nombre del archivo",
+                enterFileName: "Ingresa el nombre del archivo",
+                note: "Nota",
+                addNote: "Agregar una nota...",
+                save: "Guardar",
+                send: "Enviar",
+                sendViaBot: "Enviar vía Bot",
+                editDetails: "Editar detalles",
+                errorOccurred: "Ocurrió un error",
+                noFiles: "No hay archivos aquí",
+                noFilesText: "Envía archivos al bot para verlos aquí",
+                failedToLoad: "Error al cargar",
+                tryAgain: "Intentar de nuevo",
+                sending: "Enviando...",
+                sent: "Enviado ✓",
+                failedToSend: "Error al enviar",
+                saving: "Guardando...",
+                saved: "Guardado ✓",
+                failedToSave: "Error al guardar",
+                filesLoaded: "Archivos cargados ✓",
+                fileNameEmpty: "El nombre del archivo no puede estar vacío",
+                playbackFailed: "Error de reproducción",
+                cannotPlay: "No se puede reproducir este archivo",
+                cannotPlayVideo: "No se puede reproducir este video",
+                playlist: "Lista de reproducción",
+                tracks: "pistas",
+                type: "Tipo",
+                size: "Tamaño",
+                created: "Creado",
+            }
+        },
+        fr: {
+            ui: {
+                initializing: "Initialisation...",
+                connected: "Connecté",
+                demoMode: "Mode démo",
+                loading: "Chargement...",
+                updated: "Mis à jour",
+                error: "Erreur",
+                totalFiles: "Total des fichiers",
+                inCloud: "dans le stockage cloud",
+                storageUsed: "Stockage utilisé",
+                acrossFiles: "sur tous les fichiers",
+                categories: "Catégories",
+                items: "éléments",
+                item: "élément",
+                all: "Tous",
+                images: "Images",
+                documents: "Documents",
+                videos: "Vidéos",
+                audio: "Audio",
+                archives: "Archives",
+                yourFiles: "Vos fichiers",
+                latest: "Les plus récents",
+                oldest: "Les plus anciens",
+                preview: "Aperçu",
+                fileDetails: "Détails du fichier",
+                fileName: "Nom du fichier",
+                enterFileName: "Entrez le nom du fichier",
+                note: "Note",
+                addNote: "Ajouter une note...",
+                save: "Enregistrer",
+                send: "Envoyer",
+                sendViaBot: "Envoyer via le Bot",
+                editDetails: "Modifier les détails",
+                errorOccurred: "Une erreur s'est produite",
+                noFiles: "Aucun fichier ici",
+                noFilesText: "Envoyez des fichiers au bot pour les voir ici",
+                failedToLoad: "Échec du chargement",
+                tryAgain: "Réessayer",
+                sending: "Envoi en cours...",
+                sent: "Envoyé ✓",
+                failedToSend: "Échec de l'envoi",
+                saving: "Enregistrement...",
+                saved: "Enregistré ✓",
+                failedToSave: "Échec de l'enregistrement",
+                filesLoaded: "Fichiers chargés ✓",
+                fileNameEmpty: "Le nom du fichier ne peut pas être vide",
+                playbackFailed: "Échec de la lecture",
+                cannotPlay: "Impossible de lire ce fichier",
+                cannotPlayVideo: "Impossible de lire cette vidéo",
+                playlist: "Playlist",
+                tracks: "pistes",
+                type: "Type",
+                size: "Taille",
+                created: "Créé",
+            }
+        },
     };
 
     // ===== i18n HELPERS =====
@@ -362,7 +533,222 @@
     function isVideo(file) { return getFileType(file.fileName, file.kind).category === 'videos'; }
     function isImage(file) { return getFileType(file.fileName, file.kind).category === 'images'; }
     function canPreview(file) { return isAudio(file) || isVideo(file) || isImage(file); }
+    // Video player uchun to'g'ri initialization
+    function buildVideoPlayer(file, url) {
+        el.previewBody.style.background = '#000';
+        el.previewBody.innerHTML = `
+   <div id="vpWrap" style="width:100%;height:100%;display:flex;flex-direction:column;background:#000;position:relative;overflow:hidden;">
+     <div id="vpMain" style="flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#000;min-height:0;overflow:hidden;">
+       <video id="vpVideo" playsinline webkit-playsinline preload="metadata"
+        style="width:100%;height:100%;object-fit:contain;display:block;background:#000;"
+        poster=""
+        controlsList="nodownload">
+         <source src="${url}" type="video/mp4">
+         <source src="${url}">
+       </video>
+       <div id="vpOverlay" style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-end;opacity:1;transition:opacity 0.3s;background:linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 50%);">
+         <div style="padding:16px 16px 20px;">
+           <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.75);margin-bottom:8px;font-variant-numeric:tabular-nums;">
+             <span id="vpCurrent">0:00</span>
+             <span id="vpTotal">0:00</span>
+           </div>
+           <input type="range" id="vpSeekbar" min="0" max="1000" step="1" value="0"
+            style="width:100%;height:4px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.3);border-radius:99px;cursor:pointer;outline:none;margin-bottom:14px;">
+           <div style="display:flex;align-items:center;gap:10px;">
+             <button id="vpPlay" style="background:none;border:none;color:#fff;font-size:26px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+               <i class="fas fa-play" id="vpPlayIcon"></i>
+             </button>
+             <button id="vpMute" style="background:none;border:none;color:rgba(255,255,255,0.8);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+               <i class="fas fa-volume-high" id="vpMuteIcon"></i>
+             </button>
+             <input type="range" id="vpVolume" min="0" max="1" step="0.02" value="1"
+              style="width:70px;height:3px;-webkit-appearance:none;appearance:none;background:rgba(255,255,255,0.4);border-radius:99px;cursor:pointer;outline:none;flex-shrink:0;">
+             <span style="flex:1"></span>
+             <span id="vpResInfo" style="font-size:11px;color:rgba(255,255,255,0.5);"></span>
+             <button id="vpFullscreen" style="background:none;border:none;color:rgba(255,255,255,0.85);font-size:18px;cursor:pointer;padding:4px;display:flex;align-items:center;justify-content:center;">
+               <i class="fas fa-expand" id="vpFsIcon"></i>
+             </button>
+           </div>
+         </div>
+       </div>
+       <div id="vpCenterPlay" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,0.15);backdrop-filter:blur(8px);border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:30px;color:#fff;opacity:1;transition:all 0.3s ease;cursor:pointer;">
+         <i class="fas fa-play"></i>
+       </div>
+     </div>
+   </div>`;
 
+        initVideoPlayer(file);
+    }
+
+    // Video player initialization - yangilangan
+    function initVideoPlayer(file) {
+        const vid = $('vpVideo'), overlay = $('vpOverlay'), vpMain = $('vpMain');
+        const vpCenterPlay = $('vpCenterPlay');
+
+        if (!vid) return;
+        state.vp.video = vid;
+
+        const vpPlay = $('vpPlay'), vpPlayIcon = $('vpPlayIcon');
+        const vpMute = $('vpMute'), vpMuteIcon = $('vpMuteIcon');
+        const vpVolume = $('vpVolume');
+        const vpCurrent = $('vpCurrent'), vpTotal = $('vpTotal'), vpSeekbar = $('vpSeekbar');
+        const vpFullscreen = $('vpFullscreen'), vpFsIcon = $('vpFsIcon');
+        const vpResInfo = $('vpResInfo');
+        let controlsTimer = null;
+
+        function showControls() {
+            overlay.style.opacity = '1';
+            vpCenterPlay.style.opacity = '0';
+            clearTimeout(controlsTimer);
+            controlsTimer = setTimeout(() => {
+                if (!vid.paused) {
+                    overlay.style.opacity = '0';
+                    vpCenterPlay.style.opacity = '0';
+                }
+            }, 3500);
+        }
+
+        function updatePlayUI() {
+            vpPlayIcon.className = vid.paused ? 'fas fa-play' : 'fas fa-pause';
+        }
+
+        // Video events
+        vid.addEventListener('loadedmetadata', () => {
+            vpTotal.textContent = formatTime(vid.duration);
+            if (vid.videoWidth && vid.videoHeight) {
+                vpResInfo.textContent = vid.videoWidth + 'x' + vid.videoHeight;
+            }
+        });
+
+        vid.addEventListener('timeupdate', () => {
+            vpCurrent.textContent = formatTime(vid.currentTime);
+            if (vid.duration) {
+                vpSeekbar.value = (vid.currentTime / vid.duration) * 1000;
+            }
+        });
+
+        vid.addEventListener('ended', () => {
+            updatePlayUI();
+            overlay.style.opacity = '1';
+            clearTimeout(controlsTimer);
+        });
+
+        vid.addEventListener('error', (e) => {
+            console.error('Video error:', e);
+            showToast(tr("ui.cannotPlayVideo"), 'error');
+        });
+
+        vid.addEventListener('play', () => {
+            updatePlayUI();
+            vpCenterPlay.style.opacity = '0';
+        });
+
+        vid.addEventListener('pause', () => {
+            updatePlayUI();
+            overlay.style.opacity = '1';
+            clearTimeout(controlsTimer);
+        });
+
+        vid.addEventListener('click', (e) => {
+            if (e.target.closest('button') || e.target.closest('input')) return;
+            if (vid.paused) {
+                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
+            } else {
+                vid.pause();
+            }
+            showControls();
+        });
+
+        // Play button
+        vpPlay.addEventListener('click', e => {
+            e.stopPropagation();
+            if (vid.paused) {
+                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
+            } else {
+                vid.pause();
+            }
+            showControls();
+        });
+
+        // Center play button
+        vpCenterPlay.addEventListener('click', e => {
+            e.stopPropagation();
+            if (vid.paused) {
+                vid.play().catch(() => showToast(tr("ui.playbackFailed"), 'error'));
+            } else {
+                vid.pause();
+            }
+            showControls();
+        });
+
+        // Mute button
+        vpMute.addEventListener('click', e => {
+            e.stopPropagation();
+            vid.muted = !vid.muted;
+            vpMuteIcon.className = vid.muted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
+        });
+
+        // Volume
+        vpVolume.addEventListener('input', e => {
+            e.stopPropagation();
+            vid.volume = parseFloat(vpVolume.value);
+            vid.muted = vid.volume === 0;
+            vpMuteIcon.className = vid.muted ? 'fas fa-volume-xmark' : 'fas fa-volume-high';
+        });
+
+        // Seekbar
+        vpSeekbar.addEventListener('input', e => {
+            e.stopPropagation();
+            if (vid.duration) {
+                vid.currentTime = (parseFloat(vpSeekbar.value) / 1000) * vid.duration;
+            }
+        });
+
+        // Fullscreen
+        vpFullscreen.addEventListener('click', e => {
+            e.stopPropagation();
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                (vpMain.requestFullscreen?.() || vpMain.webkitRequestFullscreen?.() || vid.webkitEnterFullscreen?.());
+                vpFsIcon.className = 'fas fa-compress';
+            } else {
+                (document.exitFullscreen?.() || document.webkitExitFullscreen?.());
+                vpFsIcon.className = 'fas fa-expand';
+            }
+        });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                vpFsIcon.className = 'fas fa-expand';
+            }
+        });
+
+        document.addEventListener('webkitfullscreenchange', () => {
+            if (!document.webkitFullscreenElement) {
+                vpFsIcon.className = 'fas fa-expand';
+            }
+        });
+
+        // Touch events
+        vpMain.addEventListener('touchstart', e => {
+            if (e.target.closest('button') || e.target.closest('input')) return;
+            showControls();
+        }, { passive: true });
+
+        overlay.addEventListener('click', e => e.stopPropagation());
+
+        // Show controls initially
+        showControls();
+
+        // Auto play
+        const playPromise = vid.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(() => {
+                updatePlayUI();
+                overlay.style.opacity = '1';
+                vpCenterPlay.style.opacity = '1';
+            });
+        }
+    }
     // ===== API =====
     async function api(path, opts = {}) {
         const headers = {

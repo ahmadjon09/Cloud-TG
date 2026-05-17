@@ -44,6 +44,11 @@ export function startServer() {
         res.sendFile(path.join(__dirname, "..", "public", "app.html"));
     });
 
+    app.get("/gallery", (req, res) => {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.sendFile(path.join(__dirname, "..", "public", "gallery.html"));
+    });
+
     // WebApp: list files (auth required)
     app.get("/api/files", webAppAuthMiddleware, async (req, res) => {
         const owner = req.webAppUser.id;

@@ -6,13 +6,16 @@ import { UserModel } from "../models/User.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export const LANGUAGES = ["en", "uz", "ru"];
+export const LANGUAGES = ["en", "uz", "ru", "ch", "es", "fr"];
 export const DEFAULT_LANG = "en";
 
 const LANG_NAMES = {
     en: "English",
     uz: "O'zbek",
     ru: "Русский",
+    ch: "中文",
+    es: "Español",
+    fr: "Français"
 };
 
 export function getLanguageName(lang) {
