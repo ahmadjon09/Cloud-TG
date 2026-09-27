@@ -104,18 +104,40 @@ export const api = {
 /** Media links are cached for a few minutes — a file id never changes. */
 const tokenCache = new Map();
 
+const pendingTokens = new Map();
 export async function mediaLink(file, kind = "preview") {
-  const key = `${file.id}:${kind}`;
+  const key = file.id;
   const hit = tokenCache.get(key);
   if (hit && hit.expires > Date.now() + 30_000) return hit[kind];
   try {
-    const res = await api.token(file.id);
-    const entry = { preview: res.preview, thumb: res.thumb, download: res.download, expires: Date.now() + res.expiresIn * 1000 };
-    tokenCache.set(key, entry);
-    return kind === "download" ? entry.download : kind === "thumb" ? entry.thumb : entry.preview;
+    if (!pendingTokens.has(key)) {
+      pendingTokens.set(key, api.token(file.id).then(res => {
+        const entry = { preview: res.preview, thumb: res.thumb, download: res.download, expires: Date.now() + res.expiresIn * 1000 };
+        tokenCache.set(key, entry);
+        return entry;
+      }).finally(() => pendingTokens.delete(key)));
+    }
+    return (await pendingTokens.get(key))[kind];
   } catch {
     return "";
   }
+}
+
+/** Telegram WebViews support native downloads; ordinary browsers use an anchor. */
+export async function downloadMedia(file) {
+  const url = await mediaLink(file, "download");
+  if (!url) throw new ApiError("Could not get a download link");
+  const tg = window.Telegram?.WebApp;
+  if (tg?.isVersionAtLeast?.("8.0") && typeof tg.downloadFile === "function") {
+    tg.downloadFile({ url: new URL(url, window.location.href).href, file_name: file.fileName || "file" });
+    return;
+  }
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.fileName || "file";
+  document.body.append(a);
+  a.click();
+  a.remove();
 }
 
 export function clearMediaLinks() {

@@ -86,11 +86,12 @@ export function iconOf(fileName = "", kind = "") {
 
 /** Can the browser show this inline? */
 export function isPreviewable(fileName = "", kind = "") {
-  return ["images", "videos", "audio"].includes(categoryOf(fileName, kind));
+  return ["images", "videos", "audio"].includes(categoryOf(fileName, kind)) ||
+    ["pdf", "txt", "md", "log", "json", "xml", "yml", "yaml", "csv", "js", "mjs", "ts", "jsx", "tsx", "html", "css", "scss", "py", "sh", "sql", "ini", "env"].includes(extensionOf(fileName));
 }
 
-/** Telegram Bot API cannot stream files above ~50 MB. */
-export const TELEGRAM_MAX_BYTES = 50 * 1024 * 1024;
+/** Telegram Bot API cannot stream files above 20 MB. */
+export const TELEGRAM_MAX_BYTES = 20 * 1024 * 1024;
 
 export function canStreamThroughTelegram(size = 0) {
   return Number(size || 0) <= TELEGRAM_MAX_BYTES;

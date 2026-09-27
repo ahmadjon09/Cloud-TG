@@ -379,6 +379,13 @@ export function createMemoryStore({ seed = true, demoUserId = "100000001" } = {}
     return publicFile(f);
   }
 
+  // Server-only lookup: never include Telegram identifiers in public API JSON.
+  async function getFileForTransfer(id, owner) {
+    const file = files.get(String(id));
+    if (!file || String(file.ownerTgUserId) !== String(owner)) return null;
+    return { ...publicFile(file), tgFileId: file.tgFileId };
+  }
+
   async function createFile(data) {
     const file = {
       id: id24(),
@@ -595,6 +602,7 @@ export function createMemoryStore({ seed = true, demoUserId = "100000001" } = {}
     countByCategory,
     getFile,
     getFileOwned,
+    getFileForTransfer,
     createFile,
     updateFile,
     setDeleted,

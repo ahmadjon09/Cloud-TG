@@ -113,6 +113,7 @@ export const caches = {
 
 export function invalidateUser(userId) {
   caches.lists.delPrefix(`files:${userId}:`);
+  caches.stats.del(`counts:${userId}`);
   caches.stats.delPrefix(`stats:${userId}`);
   caches.users.del(`user:${userId}`);
 }

@@ -6,7 +6,7 @@ import {
 } from "./core.js";
 import { t, loadLanguage, applyStatic, bootConfig, languages, guessLanguage, rememberLanguage, lang, htmlLang, onChange as onLangChange } from "./i18n.js";
 import { icon } from "./icons.js";
-import { api, mediaLink, clearMediaLinks } from "./api.js";
+import { api, mediaLink, downloadMedia, clearMediaLinks } from "./api.js";
 import {
   toast, sheet, confirm, contextMenu, closeContextMenu, emptyState,
   skeletonGrid, skeletonRows, switchRow, segmented, avatarOf
@@ -281,6 +281,8 @@ function setView(id, { scrollTop = true } = {}) {
     if (id !== "settings") refreshFiles();
     return;
   }
+  ++fileRequest;
+  state.loading = false;
   state.view = id;
   state.files = [];
   state.skip = 0;
@@ -378,7 +380,7 @@ function applyUser() {
 }
 
 function showFatal(error) {
-  const demo = boot.demo || error?.code === "NOT_AUTHENTICATED";
+  const demo = boot.demo;
   dom.content.innerHTML = "";
   dom.content.append(
     emptyState({
@@ -398,8 +400,11 @@ function showFatal(error) {
   dom.content.querySelector(".btn")?.addEventListener("click", () => window.location.reload());
 }
 
+let fileRequest = 0;
 async function refreshFiles({ reset = true } = {}) {
   if (state.view === "settings" || state.view === "admin") return;
+  const requestId = ++fileRequest;
+  let failed = false;
   if (reset) {
     state.skip = 0;
     state.files = [];
@@ -417,23 +422,29 @@ async function refreshFiles({ reset = true } = {}) {
       limit: state.limit,
       skip: state.skip
     });
+    if (requestId !== fileRequest) return;
     state.files = reset ? res.items : [...state.files, ...res.items];
     state.total = res.total;
     state.hasMore = res.hasMore;
     state.skip = state.files.length;
     renderToolbarCounts();
   } catch (e) {
+    if (requestId !== fileRequest) return;
+    failed = true;
     console.error("[files]", e);
     if (state.files.length === 0) showFatal(e);
     else toast(e.message || t("toast.failed"), "error");
   } finally {
-    state.loading = false;
-    renderContent();
+    if (requestId === fileRequest) {
+      state.loading = false;
+      if (!failed) renderContent();
+    }
   }
 }
 
 async function loadMore() {
   if (state.loading || !state.hasMore || state.view === "settings") return;
+  const requestId = fileRequest;
   state.loading = true;
   renderLoadMore();
   try {
@@ -446,15 +457,19 @@ async function loadMore() {
       limit: state.limit,
       skip: state.skip
     });
+    if (requestId !== fileRequest) return;
     state.files = [...state.files, ...res.items];
     state.total = res.total;
     state.hasMore = res.hasMore;
     state.skip = state.files.length;
   } catch (e) {
+    if (requestId !== fileRequest) return;
     toast(e.message || t("toast.failed"), "error");
   } finally {
-    state.loading = false;
-    renderContent();
+    if (requestId === fileRequest) {
+      state.loading = false;
+      renderContent();
+    }
   }
 }
 
@@ -600,7 +615,7 @@ function thumbNode(file) {
   if (file.isPrivate) badges.append(el("span", { class: "badge-pill", html: icon("lock", { size: 12 }) }));
   if (badges.children.length) wrap.append(badges);
 
-  const canThumb = (isImage(file) || isVideo(file)) && file.fileSize <= 50 * 1024 * 1024;
+  const canThumb = (isImage(file) || isVideo(file)) && file.fileSize <= 20 * 1024 * 1024;
   if (canThumb && state.autoThumbnails) {
     const img = el("img", { alt: escapeHtml(file.fileName), loading: "lazy", decoding: "async" });
     img.addEventListener("load", () => img.classList.add("is-loaded"));
@@ -662,7 +677,7 @@ function fileRow(file) {
   const selected = state.selected.has(file.id);
   const row = el("div", { class: `file-row ${selected ? "is-selected" : ""}`, tabindex: "0", role: "button", dataset: { id: file.id } });
   const iconWrap = el("div", { class: "file-icon-sm", style: { background: colorSoftFor(file), color: colorFor(file) } });
-  if ((isImage(file) || isVideo(file)) && state.autoThumbnails && file.fileSize <= 50 * 1024 * 1024) {
+  if ((isImage(file) || isVideo(file)) && state.autoThumbnails && file.fileSize <= 20 * 1024 * 1024) {
     const img = el("img", { alt: "", loading: "lazy", decoding: "async", dataset: { thumbFor: file.id } });
     img.addEventListener("error", () => {
       img.remove();
@@ -773,7 +788,7 @@ function showMenu(file, rectOrPoint) {
   const items = [];
   if (isPreviewable(file)) items.push({ icon: "eye", label: t("action.preview"), onSelect: () => openFile(file, true) });
   items.push({ icon: "send", label: t("action.sendToTelegram"), onSelect: () => sendFiles([file.id]) });
-  if (!file.isDeleted && file.fileSize <= 50 * 1024 * 1024) {
+  if (!file.isDeleted && file.fileSize <= 20 * 1024 * 1024) {
     items.push({ icon: "download", label: t("action.download"), onSelect: () => downloadFile(file) });
   }
   items.push({ icon: "edit", label: t("action.rename"), onSelect: () => renameFile(file) });
@@ -1012,12 +1027,12 @@ async function renameFile(file) {
 }
 
 async function downloadFile(file) {
-  const url = await mediaLink(file, "download");
-  if (!url) return toast(t("toast.failed"), "error");
-  const a = el("a", { href: url, download: file.fileName || "file" });
-  document.body.append(a);
-  a.click();
-  a.remove();
+  if (file.fileSize > 20 * 1024 * 1024) return toast(t("preview.tooBigText"), "error");
+  try {
+    await downloadMedia(file);
+  } catch (e) {
+    toast(e.message || t("toast.failed"), "error");
+  }
 }
 
 async function copyName(file) {
@@ -1050,7 +1065,7 @@ async function emptyTrash() {
 function openDetails(file) {
   const body = el("div", { class: "detail" });
   const art = el("div", { class: "hero-art", style: { color: colorFor(file) } });
-  if ((isImage(file) || isVideo(file)) && file.fileSize <= 50 * 1024 * 1024) {
+  if ((isImage(file) || isVideo(file)) && file.fileSize <= 20 * 1024 * 1024) {
     const img = el("img", { alt: "", dataset: { thumbFor: file.id } });
     img.addEventListener("error", () => {
       img.remove();
@@ -1617,6 +1632,14 @@ async function main() {
   renderAll();
   loadCounts();
   setupAutoFullscreen();
+
+  // Returning from the bot should show newly uploaded files, not an old list.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && state.ready) {
+      refreshFiles();
+      loadCounts();
+    }
+  });
 
   // keep Telegram's cache warm & counts fresh
   setInterval(() => {

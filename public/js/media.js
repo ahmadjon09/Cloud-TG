@@ -2,7 +2,7 @@
 import { el, formatSize, formatDuration, categoryOf, isImage, isVideo, isAudio, extOf, haptic, clamp } from "./core.js";
 import { icon } from "./icons.js";
 import { t } from "./i18n.js";
-import { api, mediaLink } from "./api.js";
+import { api, mediaLink, downloadMedia } from "./api.js";
 import { toast, sheet } from "./ui.js";
 
 /** play() does not always return a promise (jsdom, old WebViews) */
@@ -58,12 +58,12 @@ function unsupported(file, reason) {
 }
 
 async function download(file) {
-  const url = await mediaLink(file, "download");
-  if (!url) return toast(t("toast.failed"), "error");
-  const a = el("a", { href: url, download: file.fileName || "file" });
-  document.body.append(a);
-  a.click();
-  a.remove();
+  if (file.fileSize > 20 * 1024 * 1024) return toast(t("preview.tooBigText"), "error");
+  try {
+    await downloadMedia(file);
+  } catch (e) {
+    toast(e.message || t("toast.failed"), "error");
+  }
 }
 
 async function send(file) {
@@ -509,7 +509,7 @@ function audioPlayer(file, playlist) {
 /* ============================================================ documents */
 async function documentPreview(file) {
   const ext = extOf(file.fileName);
-  if (file.fileSize > 50 * 1024 * 1024) {
+  if (file.fileSize > 20 * 1024 * 1024) {
     return unsupported(file, { title: t("preview.tooBig"), text: t("preview.tooBigText") });
   }
 
@@ -534,6 +534,7 @@ async function documentPreview(file) {
     const body = el("div", { class: "doc-preview", text: t("state.loading") });
     try {
       const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
       body.textContent = text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\n…` : text;
     } catch {

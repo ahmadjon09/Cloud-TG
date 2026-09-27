@@ -4,6 +4,7 @@ import { UserModel } from "./models/User.js";
 import { FileModel } from "./models/File.js";
 import { version } from "../i.js";
 import crypto from "crypto";
+import { invalidateUser as invalidateWebUser } from "./utils/cache.js";
 import {
     t,
     translate,
@@ -205,6 +206,7 @@ const webAppUrl = () => {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const invalidateUser = (uid) => {
+    invalidateWebUser(uid);
     memoryCache.del(`user:${uid}`);
     memoryCache.del(`stats:${uid}`);
     memoryCache.delPattern(`files:${uid}:*`);

@@ -438,7 +438,7 @@
       "unsupported": "Ko'rib bo'lmaydi",
       "unsupportedText": "Bu turdagi faylni bu yerda ochib bo'lmaydi. Telegramga yuboring.",
       "tooBig": "Fayl juda katta",
-      "tooBigText": "Telegram 50 MB dan katta fayllarni uzata olmaydi. Telegramga yuboring.",
+      "tooBigText": "Telegram 20 MB dan katta fayllarni uzata olmaydi. Telegramga yuboring.",
       "loading": "Yuklanmoqda…",
       "counter": "{current} / {total}",
       "openOriginal": "Asl faylni ochish",

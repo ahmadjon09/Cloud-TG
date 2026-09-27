@@ -438,7 +438,7 @@
       "unsupported": "无法预览",
       "unsupportedText": "此类型无法在这里打开，请发送到 Telegram。",
       "tooBig": "文件过大",
-      "tooBigText": "Telegram 无法传输超过 50 MB 的文件，请发送到 Telegram。",
+      "tooBigText": "Telegram 无法传输超过 20 MB 的文件，请发送到 Telegram。",
       "loading": "加载中…",
       "counter": "{current} / {total}",
       "openOriginal": "打开原文件",

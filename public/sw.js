@@ -38,6 +38,8 @@ self.addEventListener("fetch", event => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
+  if (isApi(url)) return;
+
   // HTML: network first (so a new deploy is picked up), offline fallback
   if (req.mode === "navigate") {
     event.respondWith(
@@ -51,8 +53,6 @@ self.addEventListener("fetch", event => {
     );
     return;
   }
-
-  if (isApi(url)) return;
 
   // CODE (js/css/json/manifest): network first — a stale icon() or el() would
   // break the whole UI, so always prefer fresh copies and only fall back to

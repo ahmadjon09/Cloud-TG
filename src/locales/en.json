@@ -438,7 +438,7 @@
       "unsupported": "Preview not available",
       "unsupportedText": "This file type cannot be previewed here. Send it to Telegram to open it.",
       "tooBig": "File is too large",
-      "tooBigText": "Telegram cannot stream files bigger than 50 MB. Send it to Telegram instead.",
+      "tooBigText": "Telegram cannot stream files bigger than 20 MB. Send it to Telegram instead.",
       "loading": "Loading preview…",
       "counter": "{current} of {total}",
       "openOriginal": "Open original",

@@ -3,12 +3,12 @@ import express from "express";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
 import { getStore } from "../../db.js";
-import { asyncRoute, requireUser } from "../middleware.js";
+import { asyncRoute } from "../middleware.js";
 import { limiters } from "../../utils/rateLimit.js";
 import { caches } from "../../utils/cache.js";
 import { tgGetFile, tgFileUrl, isTelegramConfigured } from "../../tg.js";
 import { verifyMediaToken } from "../mediaToken.js";
-import { categoryOf, guessMime, canStreamThroughTelegram } from "../../utils/fileType.js";
+import { isPreviewable, guessMime, canStreamThroughTelegram } from "../../utils/fileType.js";
 
 const FETCH_TIMEOUT = 25_000;
 
@@ -16,12 +16,12 @@ const FETCH_TIMEOUT = 25_000;
 async function resolveFile(req, res, purpose) {
   const token = typeof req.query.token === "string" ? req.query.token : "";
   const verified = verifyMediaToken(token, { purpose });
-  if (!verified.ok) {
+  if (!verified.ok || verified.fileId !== req.params.id) {
     res.status(401).json({ error: "Invalid or expired media link", code: "BAD_MEDIA_TOKEN", reason: verified.reason });
     return null;
   }
   const store = getStore();
-  const file = await store.getFileOwned(verified.fileId, verified.userId);
+  const file = await store.getFileForTransfer(verified.fileId, verified.userId);
   if (!file) {
     res.status(404).json({ error: "File not found", code: "NOT_FOUND" });
     return null;
@@ -66,6 +66,7 @@ function applyUpstreamHeaders(res, upstream, file, { asDownload }) {
     ? `attachment; filename*=UTF-8''${encodeURIComponent(name)}`
     : "inline";
   res.setHeader("Content-Disposition", disposition);
+  res.setHeader("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'");
 
   for (const header of ["content-range", "accept-ranges", "content-length", "etag", "last-modified"]) {
     const value = upstream.headers.get(header);
@@ -89,8 +90,7 @@ export function mediaRouter() {
       const limit = limiters.stream.check(`prev:${req.ip}`);
       if (!limit.ok) return res.status(429).json({ error: "Too many requests", code: "RATE_LIMIT" });
 
-      const category = categoryOf(file.fileName, file.kind);
-      if (!["images", "videos", "audio"].includes(category)) {
+      if (!isPreviewable(file.fileName, file.kind)) {
         return res.status(400).json({ error: "Preview not supported for this file", code: "PREVIEW_NOT_SUPPORTED" });
       }
       if (!canStreamThroughTelegram(file.fileSize)) {
@@ -103,10 +103,12 @@ export function mediaRouter() {
       try {
         const { upstream } = await openTelegramStream(file, req.headers.range);
         if (!upstream.ok && upstream.status !== 206) {
+          await upstream.body?.cancel();
           return res.status(502).json({ error: "Telegram could not serve this file", code: "UPSTREAM_ERROR" });
         }
         if (req.method === "HEAD") {
           applyUpstreamHeaders(res, upstream, file, { asDownload: false });
+          await upstream.body?.cancel();
           return res.status(upstream.status).end();
         }
         res.status(upstream.status); // 200 or 206
@@ -114,7 +116,8 @@ export function mediaRouter() {
         req.on("aborted", () => upstream.body?.cancel?.().catch(() => {}));
         await pipeline(Readable.fromWeb(upstream.body), res);
       } catch (e) {
-        if (e.name === "AbortError") return;
+        if (res.headersSent || res.destroyed) return res.destroy();
+        if (e.name === "AbortError") return res.status(504).json({ error: "Telegram timed out", code: "TIMEOUT" });
         const message = String(e?.message || e);
         if (message.includes("file is too big")) {
           return res.status(413).json({ error: "File is too large to stream", code: "FILE_TOO_BIG" });
@@ -139,7 +142,7 @@ export function mediaRouter() {
         return res.status(413).json({
           error: "File is too large to download",
           code: "FILE_TOO_BIG",
-          detail: "Telegram Bot API cannot serve files larger than 50 MB. Use “Send to Telegram” instead."
+          detail: "Telegram Bot API cannot serve files larger than 20 MB. Use “Send to Telegram” instead."
         });
       }
       if (!isTelegramConfigured()) {
@@ -149,14 +152,24 @@ export function mediaRouter() {
       try {
         const { upstream } = await openTelegramStream(file, req.headers.range);
         if (!upstream.ok && upstream.status !== 206) {
+          await upstream.body?.cancel();
           return res.status(502).json({ error: "Telegram could not serve this file", code: "UPSTREAM_ERROR" });
+        }
+        if (req.method === "HEAD") {
+          applyUpstreamHeaders(res, upstream, file, { asDownload: true });
+          await upstream.body?.cancel();
+          return res.status(upstream.status).end();
         }
         res.status(req.headers.range && upstream.status === 206 ? 206 : 200);
         applyUpstreamHeaders(res, upstream, file, { asDownload: true });
         req.on("aborted", () => upstream.body?.cancel?.().catch(() => {}));
         await pipeline(Readable.fromWeb(upstream.body), res);
       } catch (e) {
-        if (e.name === "AbortError") return;
+        if (res.headersSent || res.destroyed) return res.destroy();
+        if (e.name === "AbortError") return res.status(504).json({ error: "Telegram timed out", code: "TIMEOUT" });
+        if (String(e?.message || e).includes("file is too big")) {
+          return res.status(413).json({ error: "Use Send to Telegram for this file", code: "FILE_TOO_BIG" });
+        }
         console.error("[media] download failed:", String(e?.message || e));
         res.status(502).json({ error: "Could not download the file", code: "UPSTREAM_ERROR" });
       }
