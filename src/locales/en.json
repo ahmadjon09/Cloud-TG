@@ -253,6 +253,13 @@
       "offline": "You are offline",
       "online": "Back online"
     },
+    "session": {
+      "requiredTitle": "Open Cloud in Telegram",
+      "requiredText": "For your security, Cloud needs a Telegram session. Open it from the bot to continue.",
+      "expiredTitle": "Telegram session expired",
+      "expiredText": "Close Cloud, then open it again from the bot. Your files are safe.",
+      "closeAndReopen": "Close and reopen Cloud"
+    },
     "nav": {
       "all": "All files",
       "images": "Images",

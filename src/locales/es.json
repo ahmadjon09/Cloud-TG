@@ -253,6 +253,13 @@
       "offline": "Sin conexión",
       "online": "Conexión restablecida"
     },
+    "session": {
+      "requiredTitle": "Abre Cloud en Telegram",
+      "requiredText": "Por seguridad, Cloud necesita una sesión de Telegram. Ábrelo desde el bot para continuar.",
+      "expiredTitle": "La sesión de Telegram caducó",
+      "expiredText": "Cierra Cloud y vuelve a abrirlo desde el bot. Tus archivos están seguros.",
+      "closeAndReopen": "Cerrar y volver a abrir Cloud"
+    },
     "nav": {
       "all": "Todos los archivos",
       "images": "Imágenes",

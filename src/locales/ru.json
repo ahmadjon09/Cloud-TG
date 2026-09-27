@@ -253,6 +253,13 @@
       "offline": "Нет подключения",
       "online": "Соединение восстановлено"
     },
+    "session": {
+      "requiredTitle": "Откройте Cloud в Telegram",
+      "requiredText": "Для безопасности Cloud нужен сеанс Telegram. Откройте приложение через бота, чтобы продолжить.",
+      "expiredTitle": "Сеанс Telegram истёк",
+      "expiredText": "Закройте Cloud, затем снова откройте его через бота. Ваши файлы в безопасности.",
+      "closeAndReopen": "Закрыть и открыть Cloud снова"
+    },
     "nav": {
       "all": "Все файлы",
       "images": "Изображения",
