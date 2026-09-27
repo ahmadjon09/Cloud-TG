@@ -6,6 +6,7 @@ import { version } from "../i.js";
 import crypto from "crypto";
 import {
     t,
+    translate,
     detectLanguage,
     getLanguageName,
     getUserTranslator,
@@ -133,12 +134,17 @@ const formatFileSize = (bytes) => {
     return `${size.toFixed(i ? 1 : 0)} ${units[i]}`;
 };
 
-const formatTime = (date) => {
+const formatTime = (date, tr) => {
     const diff = Date.now() - new Date(date);
     const m = Math.floor(diff / 60000);
     const h = Math.floor(diff / 3600000);
     const d = Math.floor(diff / 86400000);
-    return d ? `${d}d ago` : h ? `${h}h ago` : m ? `${m}m ago` : "just now";
+    // `tr` is optional: without it we keep the short English form
+    if (!tr) return d ? `${d}d ago` : h ? `${h}h ago` : m ? `${m}m ago` : "just now";
+    if (d) return tr("time.days", { d });
+    if (h) return tr("time.hours", { h });
+    if (m) return tr("time.minutes", { m });
+    return tr("time.now");
 };
 
 const formatError = (err) =>
@@ -209,8 +215,7 @@ const KB = {
         const tr = await getUserTranslator(uid);
         return Markup.inlineKeyboard([
             ...(appUrl ? [[
-                Markup.button.webApp(`🌐 ${await tr("menu.myFiles")}`, `${appUrl}/app`),
-                // Markup.button.webApp(`🌌 Gallery`, `${appUrl}/gallery`)
+                Markup.button.webApp(`🌐 ${await tr("menu.openApp")}`, `${appUrl}/app`),
             ]] : []),
             [
                 Markup.button.callback(`📁 ${await tr("menu.myFiles")}`, "MY_FILES"),
@@ -228,6 +233,7 @@ const KB = {
                 Markup.button.callback(`ℹ️ ${await tr("menu.about")}`, "ABOUT"),
                 Markup.button.callback(`🆘 ${await tr("menu.help")}`, "HELP"),
             ],
+            ...(uid && isAdmin(uid) ? [[Markup.button.callback(`👑 ${await tr("commands.admin")}`, "ADMIN_MENU")]] : []),
         ]);
     },
 
@@ -382,8 +388,8 @@ const KB = {
     deleteConfirm: async (fileId, uid) => {
         const tr = uid ? await getUserTranslator(uid) : async (k) => k;
         return Markup.inlineKeyboard([
-            [Markup.button.callback(`🗑️ ⚠️ Ha, o'chirilsin!`, `CONFIRM:delete:${fileId}`)],
-            [Markup.button.callback(`🚫 Yo'q, bekor qil`, "CANCEL_ACTION")],
+            [Markup.button.callback(await tr("common.deleteYes"), `CONFIRM:delete:${fileId}`)],
+            [Markup.button.callback(await tr("common.deleteNo"), "CANCEL_ACTION")],
         ]);
     },
 
@@ -732,13 +738,22 @@ export async function startBot() {
 
     const bot = new Telegraf(process.env.BOT_TOKEN);
 
+    // Register the command list in every supported language so Telegram
+    // shows the menu that matches the user's app language.
     try {
-        await bot.telegram.setMyCommands([
-            { command: "start", description: "🚀 Botni ishga tushirish" },
-            { command: "help", description: "🆘 Yordam olish" },
-            { command: "f", description: "📤 Faylni yuborish: /f fayl_nomi" },
-            { command: "d", description: "🗑️ Faylni o'chirish: /d fayl_nomi" },
-        ]);
+        const base = [
+            { command: "start", key: "commands.start" },
+            { command: "help", key: "commands.help" },
+            { command: "app", key: "commands.app" },
+            { command: "f", key: "commands.f" },
+            { command: "d", key: "commands.d" }
+        ];
+        for (const lang of LANGUAGES) {
+            const commands = base.map(c => ({ command: c.command, description: translate(lang, c.key) }));
+            await bot.telegram.setMyCommands(commands, { language_code: lang }).catch(() => { });
+        }
+        // default (used when the client language is unknown)
+        await bot.telegram.setMyCommands(base.map(c => ({ command: c.command, description: translate(DEFAULT_LANG, c.key) })));
     } catch (e) {
         console.warn("⚠️ Could not set bot commands:", e.message);
     }
@@ -790,6 +805,20 @@ ${await tr("bot.tapButton")}`.trim();
         await ctx.replyWithHTML(text, await KB.main(uid));
     });
 
+    // ========== /app ==========
+    bot.command("app", async (ctx) => {
+        const uid = await upsertUser(ctx);
+        const tr = await getUserTranslator(uid);
+        const appUrl = webAppUrl();
+        if (!appUrl) {
+            return ctx.replyWithHTML(`🌐 ${await tr("common.error")}`);
+        }
+        await ctx.replyWithHTML(
+            `${pe("cloud", "☁️")} <b>${await tr("menu.openApp")}</b>`,
+            Markup.inlineKeyboard([[Markup.button.webApp(`🌐 ${await tr("menu.openApp")}`, `${appUrl}/app`)]])
+        );
+    });
+
     // ========== /help ==========
     bot.command("help", async (ctx) => {
         const uid = String(ctx.from.id);
@@ -822,7 +851,7 @@ ${await tr("help.tip")}
 
         if (!args) {
             return ctx.replyWithHTML(
-                `📤 <b>Fayl yuborish</b>\n\nIshlatish: <code>/f fayl_nomi</code>\n\nMisol: <code>/f mening_hujjatim.pdf</code>`,
+                `${await tr("files.sendTitle")}\n\n${await tr("files.sendUsage")}\n\n${await tr("files.sendExample")}`,
                 await KB.main(uid)
             );
         }
@@ -830,10 +859,7 @@ ${await tr("help.tip")}
         await withLoading(ctx, async () => {
             const files = await searchFiles(uid, args, { limit: 5 });
             if (!files.length) {
-                return ctx.replyWithHTML(
-                    `🔍 <b>"${escapeHtml(args)}"</b> — fayl topilmadi\n\n💡 To'liq fayl nomini yozing`,
-                    await KB.main(uid)
-                );
+                return ctx.replyWithHTML(await tr("files.notFoundQuery", { query: escapeHtml(args) }), await KB.main(uid));
             }
 
             // Eng mos faylni topish (to'liq mos bo'lsa birinchi)
@@ -853,16 +879,16 @@ ${await tr("help.tip")}
                         const kindEmoji = f.kind === "photo" ? "🖼️" : f.kind === "video" ? "🎬" : f.kind === "audio" ? "🎵" : "📄";
                         return `${kindEmoji} <code>/f ${escapeHtml(f.fileName)}</code>`;
                     }).join("\n");
-                    await ctx.replyWithHTML(`🔍 <b>Boshqa mos fayllar:</b>\n\n${others}`);
+                    await ctx.replyWithHTML(`${await tr("files.otherMatches")}\n\n${others}`);
                 }
             } catch (e) {
                 console.error("Send file error:", e.message);
                 await ctx.reply(await tr("common.notModified"));
             }
-        }, "📤 Fayl qidirilmoqda...");
+        }, await tr("files.searching"));
     });
 
-    // ========== /d — FAYLNI O'CHIRISH ==========
+    // ========== /d — DELETE A FILE ==========
     bot.command("d", async (ctx) => {
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
@@ -870,7 +896,7 @@ ${await tr("help.tip")}
 
         if (!args) {
             return ctx.replyWithHTML(
-                `🗑️ <b>Fayl o'chirish</b>\n\nIshlatish: <code>/d fayl_nomi</code>\n\nMisol: <code>/d eski_fayl.pdf</code>`,
+                `${await tr("files.deleteTitle")}\n\n${await tr("files.deleteUsage")}\n\n${await tr("files.deleteExample")}`,
                 await KB.main(uid)
             );
         }
@@ -878,20 +904,17 @@ ${await tr("help.tip")}
         await withLoading(ctx, async () => {
             const files = await searchFiles(uid, args, { limit: 5 });
             if (!files.length) {
-                return ctx.replyWithHTML(
-                    `🔍 <b>"${escapeHtml(args)}"</b> — fayl topilmadi\n\n💡 To'liq fayl nomini yozing`,
-                    await KB.main(uid)
-                );
+                return ctx.replyWithHTML(await tr("files.notFoundQuery", { query: escapeHtml(args) }), await KB.main(uid));
             }
 
             const exact = files.find(f => f.fileName.toLowerCase() === args.toLowerCase()) || files[0];
             const kindEmoji = exact.kind === "photo" ? "🖼️" : exact.kind === "video" ? "🎬" : exact.kind === "audio" ? "🎵" : "📄";
 
             await ctx.replyWithHTML(
-                `⚠️ <b>O'chirishni tasdiqlang!</b>\n\n${kindEmoji} Fayl: <code>${escapeHtml(exact.fileName)}</code>\n📦 ${formatFileSize(exact.fileSize)} • ${exact.kind.toUpperCase()}\n🕐 ${formatTime(exact.createdAt)}\n\n<i>⚠️ Bu amalni bekor qilib bo'lmaydi!</i>`,
+                `${await tr("files.deleteConfirmTitle")}\n\n${kindEmoji} ${await tr("files.delete")}: <code>${escapeHtml(exact.fileName)}</code>\n📦 ${formatFileSize(exact.fileSize)} • ${exact.kind.toUpperCase()}\n🕐 ${formatTime(exact.createdAt, tr)}\n\n${await tr("files.cannotUndo")}`,
                 await KB.deleteConfirm(exact._id.toString(), uid)
             );
-        }, "🔍 Fayl qidirilmoqda...");
+        }, await tr("files.searching"));
     });
 
     // ========== MAIN NAV ==========
@@ -963,7 +986,7 @@ ${await tr("help.tip")}
         sess.searchFilter = filter;
         sess.searchMode = true;
         await ctx.reply(
-            `${pe("search", "🔍")} <b>Filter set:</b> ${filter}\n\n${await tr("search.typeKeyword", { bot: ctx.me })}`,
+            `${pe("search", "🔍")} ${await tr("search.filterSet", { filter })}\n\n${await tr("search.typeKeyword", { bot: ctx.me })}`,
             { parse_mode: "HTML" }
         );
     });
@@ -1019,7 +1042,7 @@ ${await tr("help.tip")}
         const list = files
             .map(f => `• <code>${escapeHtml(f.fileName)}</code>\n  ${formatFileSize(f.fileSize)} • ${formatTime(f.createdAt)}`)
             .join("\n");
-        await ctx.editMessageText(`📁 <b>Folder Contents</b>\n\n${list}`, {
+        await ctx.editMessageText(`${await tr("folders.folderContents")}\n\n${list}`, {
             parse_mode: "HTML",
             reply_markup: (await KB.folders(uid)).reply_markup,
         });
@@ -1037,7 +1060,7 @@ ${await tr("help.tip")}
             ...files.slice(0, 8).map(f => [Markup.button.callback(`📄 ${f.fileName.slice(0, 30)}`, `MOVE_SELECT:${f._id}`)]),
             [Markup.button.callback(`${E.back} ${await tr("files.back")}`, "FOLDERS_MAIN")],
         ]);
-        await ctx.editMessageText(`🗂️ <b>Select file to move:</b>`, { parse_mode: "HTML", reply_markup: kb.reply_markup });
+        await ctx.editMessageText(await tr("folders.selectFileToMove"), { parse_mode: "HTML", reply_markup: kb.reply_markup });
     });
 
     bot.action(/^MOVE_SELECT:(.+)$/, async (ctx) => {
@@ -1050,7 +1073,7 @@ ${await tr("help.tip")}
 
         const kb = Markup.inlineKeyboard([
             ...user.folderIds.map(f => [Markup.button.callback(`📁 ${f.name}`, `MOVE_EXEC:${fid}:${f._id}`)]),
-            [Markup.button.callback(`${E.home} Root (no folder)`, `MOVE_EXEC:${fid}:null`)],
+            [Markup.button.callback(await tr("folders.root"), `MOVE_EXEC:${fid}:null`)],
             [Markup.button.callback(await tr("expiry.cancel"), "CANCEL_ACTION")],
         ]);
         await ctx.editMessageText(await tr("folders.moveTo"), { parse_mode: "HTML", reply_markup: kb.reply_markup });
@@ -1093,7 +1116,7 @@ ${await tr("help.tip")}
         const appUrl2 = webAppUrl();
         await safeEdit(
             ctx,
-            `${pe("share", "🔗")} ${await tr("share.title")}\n\n${await tr("share.instructions", { webApp: appUrl2 ? "\n\nOr use Web App:" : "" })}`,
+            `${pe("share", "🔗")} ${await tr("share.title")}\n\n${await tr("share.instructions", { webApp: appUrl2 ? await tr("share.orUseWebApp") : "" })}`,
             Markup.inlineKeyboard([
                 ...(appUrl2 ? [[Markup.button.webApp("🌐 Web App", appUrl2)]] : []),
                 [Markup.button.callback(`${E.back} ${await tr("files.back")}`, "MAIN")],
@@ -1210,7 +1233,7 @@ ${await tr("help.tip")}
             { $set: { "settings.autoExpire": dur === "none" ? null : dur } }
         );
         invalidateUser(uid);
-        await ctx.answerCbQuery(await tr("expiry.set", { value: dur === "none" ? "disabled" : dur }), { show_alert: true });
+        await ctx.answerCbQuery(await tr("expiry.set", { value: dur === "none" ? await tr("expiry.off") : dur }), { show_alert: true });
         const user = await UserModel.findOne({ tgUserId: uid }, { settings: 1, language: 1 }).lean();
         await ctx.editMessageText(await tr("settings.title"), {
             parse_mode: "HTML",
@@ -1230,7 +1253,7 @@ ${await tr("help.tip")}
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
         const stats = await getUserStats(uid);
-        if (!stats) return ctx.answerCbQuery("Error loading stats", { show_alert: true });
+        if (!stats) return ctx.answerCbQuery(await tr("common.statsError"), { show_alert: true });
 
         const kindText =
             stats.byKind.map(k => `• ${k._id}: ${k.count} file(s) • ${formatFileSize(k.size)}`).join("\n")
@@ -1266,7 +1289,7 @@ ${await tr("help.tip")}
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
         ensureSession(ctx).pendingAction = { type: "rename", fileId: ctx.match[1] };
-        await ctx.editMessageText(`${pe("rename", "✏️")} <b>${await tr("files.rename")}</b>\n\nSend the new name:`, {
+        await ctx.editMessageText(`${pe("rename", "✏️")} <b>${await tr("files.rename")}</b>\n\n${await tr("files.renamePrompt")}`, {
             parse_mode: "HTML",
             reply_markup: Markup.inlineKeyboard([[Markup.button.callback(await tr("expiry.cancel"), "CANCEL_ACTION")]]).reply_markup,
         });
@@ -1279,7 +1302,7 @@ ${await tr("help.tip")}
         const file = await FileModel.findById(ctx.match[1]).lean();
         await safeEdit(
             ctx,
-            `⚠️ <b>Diqqat! O'chirishni tasdiqlang</b>\n\n🗑️ Fayl: <code>${escapeHtml(file?.fileName || "Unknown")}</code>\n\n<i>Bu amalni bekor qilib bo'lmaydi!</i>`,
+            `${await tr("files.deleteConfirmTitle")}\n\n🗑️ ${await tr("files.delete")}: <code>${escapeHtml(file?.fileName || "Unknown")}</code>\n📦 ${formatFileSize(file?.fileSize || 0)} • ${(file?.kind || "file").toUpperCase()}\n\n${await tr("files.cannotUndo")}`,
             await KB.deleteConfirm(ctx.match[1], uid)
         );
     });
@@ -1319,7 +1342,7 @@ ${await tr("help.tip")}
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
         if (sess.pendingAction?.type !== "set_expiry") {
-            return ctx.answerCbQuery("Session expired. Please try again.", { show_alert: true });
+            return ctx.answerCbQuery(await tr("common.sessionExpired"), { show_alert: true });
         }
         await ctx.answerCbQuery(await tr("common.setting"));
         const dur = ctx.match[1];
@@ -1328,7 +1351,7 @@ ${await tr("help.tip")}
 
         const res = await setExpiry(uid, fileId, dur);
         const msg = res
-            ? `✅ ${await tr("expiry.set", { value: dur === "none" ? "removed" : dur })}`
+            ? `✅ ${await tr("expiry.set", { value: dur === "none" ? await tr("expiry.removed") : dur })}`
             : `❌ ${await tr("common.notFound")}`;
         await ctx.editMessageText(msg, { reply_markup: (await KB.files(fileId, uid)).reply_markup });
     });
@@ -1342,7 +1365,7 @@ ${await tr("help.tip")}
 
         const kb = Markup.inlineKeyboard([
             ...user.folderIds.map(f => [Markup.button.callback(`📁 ${f.name}`, `MOVE_EXEC:${ctx.match[1]}:${f._id}`)]),
-            [Markup.button.callback(`${E.home} Root`, `MOVE_EXEC:${ctx.match[1]}:null`)],
+            [Markup.button.callback(await tr("folders.root"), `MOVE_EXEC:${ctx.match[1]}:null`)],
             [Markup.button.callback(await tr("expiry.cancel"), "CANCEL_ACTION")],
         ]);
         await ctx.editMessageText(await tr("folders.moveTo"), { parse_mode: "HTML", reply_markup: kb.reply_markup });
@@ -1431,8 +1454,16 @@ ${await tr("help.tipTemp")}`,
         await ctx.replyWithHTML(`${pe("crown", "👑")} ${await tr("admin.title")}`, await KB.admin(uid));
     });
 
+    bot.action("ADMIN_MENU", async (ctx) => {
+        await ctx.answerCbQuery();
+        if (!isAdmin(ctx.from?.id)) return;
+        const uid = String(ctx.from.id);
+        const tr = await getUserTranslator(uid);
+        await ctx.replyWithHTML(`${pe("crown", "👑")} ${await tr("admin.title")}`, await KB.admin(uid));
+    });
+
     bot.action("ADM:STATS", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(DEFAULT_LANG, "admin.accessDenied"), { show_alert: true });
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(await getUserLanguage(String(ctx.from.id)), "admin.accessDenied"), { show_alert: true });
         await ctx.answerCbQuery();
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
@@ -1460,7 +1491,7 @@ ${await tr("admin.rateLimitEntries", { count: rateLimitMap.size })}`,
     });
 
     bot.action("ADM:CLEANUP", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(DEFAULT_LANG, "admin.accessDenied"), { show_alert: true });
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(await getUserLanguage(String(ctx.from.id)), "admin.accessDenied"), { show_alert: true });
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
         await ctx.answerCbQuery(await tr("admin.cleanup"));
@@ -1482,12 +1513,12 @@ ${await tr("admin.cacheCleared", { count: cacheCleared })}`,
                 await KB.admin(uid)
             );
         } catch (e) {
-            await ctx.reply("❌ Cleanup error: " + e.message);
+            await ctx.replyWithHTML(await tr("admin.cleanupFailed", { error: escapeHtml(e.message) }));
         }
     });
 
     bot.action("ADM:BROADCAST", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(DEFAULT_LANG, "admin.accessDenied"), { show_alert: true });
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(await getUserLanguage(String(ctx.from.id)), "admin.accessDenied"), { show_alert: true });
         await ctx.answerCbQuery();
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
@@ -1499,7 +1530,7 @@ ${await tr("admin.cacheCleared", { count: cacheCleared })}`,
     });
 
     bot.action("ADM:CANCEL_BROADCAST", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(DEFAULT_LANG, "admin.accessDenied"), { show_alert: true });
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(await getUserLanguage(String(ctx.from.id)), "admin.accessDenied"), { show_alert: true });
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
         await ctx.answerCbQuery(await tr("common.cancelled"));
@@ -1511,7 +1542,7 @@ ${await tr("admin.cacheCleared", { count: cacheCleared })}`,
     });
 
     bot.action("ADM:USERS", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(DEFAULT_LANG, "admin.accessDenied"), { show_alert: true });
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(await getUserLanguage(String(ctx.from.id)), "admin.accessDenied"), { show_alert: true });
         await ctx.answerCbQuery();
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
@@ -1540,12 +1571,12 @@ ${topList}`,
                 await KB.admin(uid)
             );
         } catch (e) {
-            await ctx.reply("❌ Error: " + e.message);
+            await ctx.replyWithHTML(await tr("admin.error", { error: escapeHtml(e.message) }));
         }
     });
 
     bot.action("ADM:CACHE", async (ctx) => {
-        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(DEFAULT_LANG, "admin.accessDenied"), { show_alert: true });
+        if (!isAdmin(ctx.from?.id)) return ctx.answerCbQuery(await t(await getUserLanguage(String(ctx.from.id)), "admin.accessDenied"), { show_alert: true });
         const uid = String(ctx.from.id);
         const tr = await getUserTranslator(uid);
         const before = cache.size;
@@ -1567,7 +1598,7 @@ ${topList}`,
             sess.broadcast = false;
             if (txt === "/cancel") return ctx.replyWithHTML(await tr("admin.broadcastCancelled"), await KB.admin(uid));
 
-            const loading = await ctx.reply("📤 Sending broadcast...");
+            const loading = await ctx.reply(await tr("admin.broadcastStart"));
             let sent = 0, failed = 0, blocked = 0, page = 0;
             const limit = 100;
 
@@ -1631,7 +1662,7 @@ ${topList}`,
                         `   📤 <code>/f ${escapeHtml(f.fileName)}</code>  🗑️ <code>/d ${escapeHtml(f.fileName)}</code>`;
                 })
                 .join("\n\n");
-            return ctx.replyWithHTML(`${await tr("search.results", { count: files.length })}\n\n${res}\n\n💡 <i>Faylni olish uchun /f, o'chirish uchun /d yozing</i>`, await KB.main(uid));
+            return ctx.replyWithHTML(`${await tr("search.results", { count: files.length })}\n\n${res}\n\n💡 <i>${await tr("common.sendDeleteHint")}</i>`, await KB.main(uid));
         }
 
         // --- PENDING ACTIONS ---
@@ -1688,7 +1719,7 @@ ${topList}`,
         }
 
         // --- DEFAULT ---
-        await ctx.reply("👆 Use the buttons below:", { reply_markup: (await KB.main(uid)).reply_markup });
+        await ctx.reply(await tr("common.useButtons"), { reply_markup: (await KB.main(uid)).reply_markup });
     });
 
     // ==================== FILE HANDLER ====================
@@ -1726,13 +1757,11 @@ ${topList}`,
                     }
                     invalidateUser(uid);
                     await ctx.replyWithHTML(
-                        `${pe("success", "✅")} ${await batchTr("files.fileSaved")}
-
-📄 <code>${escapeHtml(name)}</code>
-📦 ${formatFileSize(obj.file_size || 0)} • <b>${kind.toUpperCase()}</b>
-🔐 ${isPriv ? `Private 🔒` : "Public"}${file.expiresAt ? `\n⏰ Expires: ${new Date(file.expiresAt).toLocaleString()}` : ""}
-
-👇`,
+                        `${pe("success", "✅")} ${await batchTr("files.fileSaved")}\n\n` +
+                        `📄 <code>${escapeHtml(name)}</code>\n` +
+                        `📦 ${formatFileSize(obj.file_size || 0)} • <b>${kind.toUpperCase()}</b>\n` +
+                        `🔐 ${isPriv ? await batchTr("files.privateBadge") : await batchTr("files.publicBadge")}` +
+                        `${file.expiresAt ? await batchTr("files.expiresLabel", { date: new Date(file.expiresAt).toLocaleString() }) : ""}`,
                         await KB.files(file._id.toString(), uid)
                     );
                 } catch (err) {
@@ -1759,14 +1788,14 @@ ${topList}`,
 
             invalidateUser(bUid);
 
-            let text = `${pe("success", "✅")} <b>${saved} file${saved !== 1 ? "s" : ""} saved!</b>\n\n`;
+            let text = `${pe("success", "✅")} <b>${await batchTr("files.batchTitle", { count: saved })}</b>\n\n`;
             if (savedFiles.length) {
                 text += savedFiles.map(f => `📄 <code>${escapeHtml(f.name)}</code> — ${formatFileSize(f.size)}`).join("\n");
                 text += "\n";
             }
-            if (duplicates) text += `\n${await batchTr("files.alreadySaved")} (${duplicates} skipped)`;
-            if (errors) text += `\n❌ ${errors} failed to save`;
-            text += `\n\n💾 Total: ${saved}`;
+            if (duplicates) text += `\n${await batchTr("files.batchSkipped", { count: duplicates })}`;
+            if (errors) text += `\n❌ ${await batchTr("files.batchFailed", { count: errors })}`;
+            text += `\n\n${await batchTr("files.batchTotal", { count: saved })}`;
 
             await firstCtx.replyWithHTML(text, await KB.main(bUid));
         });
@@ -1776,7 +1805,9 @@ ${topList}`,
 
     // Catch-all callback
     bot.on("callback_query", async (ctx) => {
-        await ctx.answerCbQuery("⚠️ Unknown action").catch(() => { });
+        const uid = ctx.from?.id ? String(ctx.from.id) : null;
+        const tr = uid ? await getUserTranslator(uid) : async (k, v) => k;
+        await ctx.answerCbQuery(`⚠️ ${await tr("common.error")}`).catch(() => { });
     });
 
     // ========== LAUNCH ==========

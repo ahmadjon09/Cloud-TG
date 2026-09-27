@@ -1,167 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{LANG}}">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cloud · Storage</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-    <link rel="stylesheet" href="/public/app.css">
+  <meta charset="utf-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover, user-scalable=yes">
+  <meta name="theme-color" content="#0b1020" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
+  <meta name="description" content="Cloud — your personal cloud storage inside Telegram">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>☁️ Cloud</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="/public/css/tokens.css?v={{BUILD}}">
+  <link rel="stylesheet" href="/public/css/app.css?v={{BUILD}}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f8cff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 9.5A3.75 3.75 0 0 0 7 19h10.5Z'/%3E%3C/svg%3E">
 </head>
 
 <body>
+  <div class="app" id="app">
+    <!-- ───────────────────────── sidebar (desktop + drawer) ─────────────── -->
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+      <div class="brand">
+        <span class="brand-mark" id="brandMark"></span>
+        <div class="grow">
+          <div class="brand-name" data-i18n="app.name">Cloud</div>
+          <div class="brand-sub" data-i18n="app.subtitle">Your personal cloud storage</div>
+        </div>
+        <button class="icon-btn" id="sidebarClose" data-i18n-title="nav.closeMenu" aria-label="Close menu"></button>
+      </div>
+      <nav class="nav" id="navList"></nav>
+      <div class="sidebar-foot">
+        <div class="storage-card" id="storageCard"></div>
+        <div class="user-card" id="userCard"></div>
+      </div>
+    </aside>
 
-    <div class="app-container">
+    <!-- ───────────────────────── main ───────────────────────── -->
+    <div class="main">
+      <header class="topbar">
+        <button class="icon-btn" id="menuBtn" data-i18n-title="nav.openMenu" aria-label="Open menu"></button>
+        <div class="topbar-title truncate" id="viewTitle" data-i18n="nav.all">All files</div>
 
-        <!-- Header -->
-        <div class="header">
-            <div class="user-info">
-                <span class="user-name" id="who">Loading...</span>
-                <span class="user-status" id="status">
-                    <span class="status-dot"></span>
-                    <span data-i18n="ui.initializing">Initializing...</span>
-                </span>
-            </div>
-            <button class="refresh-btn" id="refresh" title="Refresh">
-                <i class="fas fa-sync-alt"></i>
-            </button>
+        <div class="search-wrap" id="searchWrap">
+          <span id="searchIcon"></span>
+          <input class="search-input" id="searchInput" type="search" autocomplete="off" enterkeyhint="search"
+            data-i18n-placeholder="action.searchFiles" placeholder="Search by name…">
+          <button class="search-clear hidden" id="searchClear" aria-label="Clear"></button>
         </div>
 
-        <!-- Stats -->
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label"><i class="fas fa-layer-group"></i> <span data-i18n="ui.totalFiles">Total
-                        files</span></div>
-                <div class="stat-value" id="totalFiles">0</div>
-                <div class="stat-sub" data-i18n="ui.inCloud">in cloud storage</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label"><i class="fas fa-database"></i> <span data-i18n="ui.storageUsed">Storage
-                        used</span></div>
-                <div class="stat-value" id="totalSize">0 B</div>
-                <div class="stat-sub" data-i18n="ui.acrossFiles">across all files</div>
-            </div>
+        <div class="topbar-actions">
+          <button class="icon-btn" id="refreshBtn" data-i18n-title="action.refresh" aria-label="Refresh"></button>
+          <button class="icon-btn" id="viewBtn" data-i18n-title="action.sort" aria-label="View"></button>
+          <button class="icon-btn" id="fullscreenBtn" data-i18n-title="action.fullscreen" aria-label="Full screen"></button>
+          <button class="icon-btn" id="moreBtn" data-i18n-title="action.more" aria-label="More"></button>
         </div>
+      </header>
 
-        <!-- Categories -->
-        <div class="categories-section">
-            <div class="section-header">
-                <h2 class="section-title" data-i18n="ui.categories">Categories</h2>
-                <span class="section-badge" id="fileCount">0 <span data-i18n="ui.items">items</span></span>
-            </div>
-            <div class="categories-scroll">
-                <button class="category-chip active" data-category="all">
-                    <i class="fas fa-border-all"></i> <span data-i18n="ui.all">All</span>
-                </button>
-                <button class="category-chip" data-category="images">
-                    <i class="fas fa-image"></i> <span data-i18n="ui.images">Images</span>
-                </button>
-                <button class="category-chip" data-category="documents">
-                    <i class="fas fa-file-lines"></i> <span data-i18n="ui.documents">Documents</span>
-                </button>
-                <button class="category-chip" data-category="videos">
-                    <i class="fas fa-video"></i> <span data-i18n="ui.videos">Videos</span>
-                </button>
-                <button class="category-chip" data-category="audio">
-                    <i class="fas fa-music"></i> <span data-i18n="ui.audio">Audio</span>
-                </button>
-                <button class="category-chip" data-category="archives">
-                    <i class="fas fa-file-zipper"></i> <span data-i18n="ui.archives">Archives</span>
-                </button>
-            </div>
+      <div class="chips" id="chips"></div>
+
+      <div class="toolbar" id="toolbar">
+        <div class="grow">
+          <span class="result-count" id="resultCount"></span>
         </div>
+        <div class="row" id="toolbarActions"></div>
+      </div>
 
-        <!-- Files Header -->
-        <div class="section-header">
-            <h2 class="section-title" data-i18n="ui.yourFiles">Your files</h2>
-            <button class="sort-button" id="sortBtn">
-                <i class="fas fa-arrow-down-wide-short"></i>
-                <span id="sortText" data-i18n="ui.latest">Latest</span>
-            </button>
-        </div>
-
-        <!-- Files List -->
-        <div id="list" class="files-grid"></div>
-
+      <main class="content" id="content" tabindex="-1"></main>
     </div>
 
-    <!-- ===== PREVIEW MODAL ===== -->
-    <div class="preview-modal" id="previewModal">
-        <div class="preview-content">
-            <div class="preview-header">
-                <button class="preview-close" id="previewClose" title="Close">
-                    <i class="fas fa-xmark"></i>
-                </button>
-                <span class="preview-title" id="previewTitle" data-i18n="ui.preview">Preview</span>
-                <div class="preview-actions">
-                    <button class="preview-action-btn" id="previewSend" title="Send via Bot">
-                        <i class="fas fa-paper-plane"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="preview-body" id="previewBody"></div>
-        </div>
-    </div>
+    <nav class="tabbar" id="tabbar" aria-label="Sections"></nav>
+  </div>
 
-    <!-- ===== EDIT MODAL ===== -->
-    <div class="modal" id="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title" data-i18n="ui.fileDetails">File details</span>
-                <button class="close-btn" id="close"><i class="fas fa-xmark"></i></button>
-            </div>
-            <div class="modal-body">
-                <div class="input-group">
-                    <label class="input-label"><i class="fas fa-file"></i> <span data-i18n="ui.fileName">File
-                            name</span></label>
-                    <input type="text" class="input-field" id="m_name" data-i18n-placeholder="ui.enterFileName"
-                        placeholder="Enter file name" maxlength="200">
-                </div>
-                <div class="input-group">
-                    <label class="input-label"><i class="fas fa-note-sticky"></i> <span
-                            data-i18n="ui.note">Note</span></label>
-                    <textarea class="input-field" id="m_note" data-i18n-placeholder="ui.addNote"
-                        placeholder="Add a note..." rows="3" maxlength="500"></textarea>
-                </div>
-                <div class="meta-info" id="m_meta"></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-primary" id="saveChanges">
-                    <i class="fas fa-floppy-disk"></i> <span data-i18n="ui.save">Save</span>
-                </button>
-                <button class="btn btn-secondary" id="sendToBot">
-                    <i class="fas fa-paper-plane"></i> <span data-i18n="ui.send">Send</span>
-                </button>
-            </div>
-            <div class="error-suggestion" id="errorSuggestion" style="display:none;">
-                <i class="fas fa-circle-exclamation"></i>
-                <span id="errorMessage" data-i18n="ui.errorOccurred">Error occurred</span>
-                <button class="btn btn-primary btn-small" id="suggestSendViaBot">
-                    <i class="fas fa-paper-plane"></i> <span data-i18n="ui.sendViaBot">Send via Bot</span>
-                </button>
-            </div>
-        </div>
-    </div>
+  <button class="fab hidden" id="fab" aria-label="Menu"></button>
 
-    <!-- Toast -->
-    <div class="toast" id="toast"></div>
-
-    <!-- Context Menu -->
-    <div class="context-menu" id="contextMenu">
-        <button class="context-item" data-action="preview">
-            <i class="fas fa-eye"></i> <span data-i18n="ui.preview">Preview</span>
-        </button>
-        <button class="context-item" data-action="send">
-            <i class="fas fa-paper-plane"></i> <span data-i18n="ui.sendViaBot">Send via Bot</span>
-        </button>
-        <button class="context-item" data-action="edit">
-            <i class="fas fa-pen"></i> <span data-i18n="ui.editDetails">Edit details</span>
-        </button>
-    </div>
-
-    <script src="/public/app.js" defer></script>
+  <script id="boot" type="application/json">{{BOOT}}</script>
+  <script type="module" src="/public/js/app.js?v={{BUILD}}"></script>
 </body>
 
 </html>

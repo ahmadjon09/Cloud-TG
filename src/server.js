@@ -1,248 +1,173 @@
+// server.js — HTTP entry point: static shell, REST API, admin API and media streaming
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import { webAppAuthMiddleware } from "./authWebApp.js";
-import { FileModel } from "./models/File.js";
-import { tgGetFile, tgFileUrl } from "./tg.js";
-import { UserModel } from "./models/User.js";
+import fs from "fs";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import {
+  compression,
+  securityHeaders,
+  rateLimit,
+  requireAdmin,
+  notFound,
+  errorHandler
+} from "./http/middleware.js";
+import { staticHandler, fileHandler } from "./http/static.js";
+import { pageHandler, getBuildHash, computeBuildHash } from "./http/pages.js";
+import { apiRouter } from "./http/routes/api.js";
+import { mediaRouter } from "./http/routes/media.js";
+import { adminRouter } from "./http/routes/admin.js";
+import { webAppAuthMiddleware, optionalWebAppAuth } from "./authWebApp.js";
+import { LANGUAGES, webBundle } from "./utils/i18n.js";
+import { limiters, sweepAll as sweepLimiters } from "./utils/rateLimit.js";
+import { sweepAll as sweepCaches } from "./utils/cache.js";
+import { getDriver } from "./db.js";
+import { version } from "../i.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(__dirname, "..");
+const PUBLIC_DIR = path.join(ROOT, "public");
+const LOCALES_DIR = path.join(__dirname, "locales");
+
+const startedAt = Date.now();
+
+/** Web bundles are rebuilt on demand and cached (they only change on deploy). */
+const bundleCache = new Map();
+function localeBundle(lang) {
+  const cached = bundleCache.get(lang);
+  if (cached) return cached;
+  const bundle = { v: version, ...webBundle(lang) };
+  const body = JSON.stringify(bundle);
+  bundleCache.set(lang, body);
+  return body;
+}
+
 export function startServer() {
-    const app = express();
-    const TG_FILE_MAX = 50 * 1024 * 1024;
-    const ORIGIN = "http://localhost:5173";
-    app.use(express.json({ limit: "1mb" }));
+  const app = express();
+  const dev = process.env.NODE_ENV !== "production";
 
-    app.use((_, res, next) => {
-        res.setHeader(
-            "Content-Security-Policy",
-            [
-                "default-src 'self'",
-                "script-src 'self' 'unsafe-inline' https://telegram.org https://cdn.jsdelivr.net",
-                "script-src-elem 'self' 'unsafe-inline' https://telegram.org https://cdn.jsdelivr.net",
-                "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; " +
-                "font-src 'self' https://cdnjs.cloudflare.com; " +
-                "connect-src 'self' https: wss:",
-                "img-src 'self' data: blob:",
-                "frame-ancestors https://web.telegram.org https://t.me",
-            ].join("; ")
-        );
-        next();
-    });
-    app.get('/hello', (_, res) => res.send('Hello!'))
-    // Static HTML (single big page)
-    app.use("/public", express.static(path.join(__dirname, "..", "public"), {
-        setHeaders(res) {
-            res.setHeader("Cache-Control", "no-store");
-        }
-    }));
+  computeBuildHash(PUBLIC_DIR);
 
-    // WebApp entry page
-    app.get("/app", (req, res) => {
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.sendFile(path.join(__dirname, "..", "public", "app.html"));
-    });
+  app.set("trust proxy", true);
+  app.set("etag", false); // we set ETags ourselves where it matters
+  app.disable("x-powered-by");
 
-    app.get("/gallery", (req, res) => {
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.sendFile(path.join(__dirname, "..", "public", "gallery.html"));
-    });
+  app.use(securityHeaders({ dev }));
+  app.use(compression());
+  app.use(express.json({ limit: "512kb" }));
+  app.use(express.urlencoded({ extended: false, limit: "512kb" }));
 
-    // WebApp: list files (auth required)
-    app.get("/api/files", webAppAuthMiddleware, async (req, res) => {
-        const owner = req.webAppUser.id;
-        const items = await FileModel.find({ ownerTgUserId: owner })
-            .sort({ createdAt: -1 })
-            .limit(500)
-            .lean();
+  // ---------------- health ----------------
+  app.get("/hello", (_req, res) => res.type("text/plain").send("Hello!"));
+  app.get("/health", (_req, res) =>
+    res.json({
+      ok: true,
+      version,
+      driver: getDriver(),
+      uptime: Math.floor((Date.now() - startedAt) / 1000),
+      telegram: Boolean(process.env.BOT_TOKEN),
+      demo: process.env.DEMO_MODE === "true"
+    })
+  );
 
-        res.json(items.map(x => ({
-            id: String(x._id),
-            kind: x.kind,
-            fileName: x.fileName,
-            mimeType: x.mimeType,
-            fileSize: x.fileSize,
-            note: x.note,
-            createdAt: x.createdAt
-        })));
-    });
+  // ---------------- static assets ----------------
+  app.use(staticHandler("/public", PUBLIC_DIR));
 
-    app.get("/api/files/:id/preview", webAppAuthMiddleware, async (req, res) => {
-        const owner = req.webAppUser.id;
-        const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();
-        if (!file) return res.status(404).json({ error: "Not found" });
+  app.get("/locales/:lang.json", (req, res) => {
+    const lang = String(req.params.lang).replace(/\.json$/, "");
+    if (!LANGUAGES.includes(lang)) return res.status(404).json({ error: "Unknown language" });
+    res.setHeader("content-type", "application/json; charset=utf-8");
+    res.setHeader("cache-control", "public, max-age=3600, must-revalidate");
+    res.send(localeBundle(lang));
+  });
 
-        // Only preview media
-        if (!["photo", "video", "audio"].includes(file.kind)) {
-            return res.status(400).json({ error: "PREVIEW_NOT_SUPPORTED" });
-        }
+  app.get("/manifest.webmanifest", (req, res, next) =>
+    fileHandler(path.join(PUBLIC_DIR, "manifest.webmanifest"), {
+      cacheControl: "public, max-age=3600",
+      render: body =>
+        body
+          .replace(/\{\{VERSION\}\}/g, version)
+          .replace(/\{\{BUILD\}\}/g, getBuildHash())
+    })(req, res, next)
+  );
 
-        if ((file.fileSize || 0) > TG_FILE_MAX) {
-            return res.status(413).json({ error: "FILE_TOO_BIG_FOR_PREVIEW" });
-        }
+  app.get("/sw.js", (req, res, next) =>
+    fileHandler(path.join(PUBLIC_DIR, "sw.js"), {
+      cacheControl: "no-cache",
+      render: body => body.replace(/\{\{BUILD\}\}/g, getBuildHash())
+    })(req, res, next)
+  );
 
-        try {
-            const token = process.env.BOT_TOKEN;
-            const tgFile = await tgGetFile(token, file.tgFileId);
-            const url = tgFileUrl(token, tgFile.file_path);
+  app.get("/offline", (req, res, next) =>
+    fileHandler(path.join(PUBLIC_DIR, "offline.html"), { cacheControl: "no-store" })(req, res, next)
+  );
 
-            const range = req.headers.range; // e.g. "bytes=0-"
-            const headers = {};
-            if (range) headers["Range"] = range;
+  // ---------------- HTML shells ----------------
+  app.get(
+    "/app",
+    optionalWebAppAuth,
+    pageHandler(path.join(PUBLIC_DIR, "app.html"), { title: "Cloud" })
+  );
+  app.get(
+    "/admin",
+    optionalWebAppAuth,
+    pageHandler(path.join(PUBLIC_DIR, "admin.html"), { title: "Cloud · Admin" })
+  );
+  app.get("/", (_req, res) => res.redirect(302, "/app"));
 
-            const r = await fetch(url, { headers });
+  // ---------------- API ----------------
+  const api = express.Router();
+  api.use(rateLimit(limiters.api, req => req.tgUser?.id || req.ip));
 
-            if (!r.ok || !r.body) {
-                return res.status(502).json({ error: "Telegram fetch failed" });
-            }
+  // Media is authenticated by its own short-lived signed token (no initData needed)
+  api.use(mediaRouter());
 
-            // Important for <video> seeking: forward status and range headers when present
-            res.status(r.status); // 200 or 206
+  // Everything below requires a valid Telegram WebApp session
+  api.use(webAppAuthMiddleware);
+  api.use(rateLimit(limiters.auth, req => `auth:${req.tgUser?.id || req.ip}`, { max: 600 }));
 
-            const ct = file.mimeType || r.headers.get("content-type") || "application/octet-stream";
-            res.setHeader("Content-Type", ct);
+  api.use(apiRouter());
 
-            // inline preview (NOT attachment)
-            res.setHeader("Content-Disposition", "inline");
+  app.use("/api", api);
 
-            const cr = r.headers.get("content-range");
-            const al = r.headers.get("accept-ranges");
-            const cl = r.headers.get("content-length");
+  // Admin API lives under its own prefix so paths can never collide with the app API
+  const admin = express.Router();
+  admin.use(rateLimit(limiters.admin, req => req.tgUser?.id || req.ip));
+  admin.use(webAppAuthMiddleware);
+  admin.use(requireAdmin);
+  admin.use(adminRouter());
+  app.use("/api/admin", admin);
 
-            if (cr) res.setHeader("Content-Range", cr);
-            if (al) res.setHeader("Accept-Ranges", al);
-            if (cl) res.setHeader("Content-Length", cl);
+  // ---------------- fallback ----------------
+  app.use(notFound);
+  app.use(errorHandler);
 
-            const reader = r.body.getReader();
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                res.write(Buffer.from(value));
-            }
-            res.end();
-        } catch (e) {
-            const msg = String(e?.message || e);
-            if (msg.includes("file is too big")) {
-                return res.status(413).json({ error: "FILE_TOO_BIG_FOR_PREVIEW" });
-            }
-            return res.status(500).json({ error: "Server error" });
-        }
-    });
-    // WebApp: rename/edit metadata
-    app.patch("/api/files/:id", webAppAuthMiddleware, async (req, res) => {
-        const owner = req.webAppUser.id;
-        const { fileName, note } = req.body || {};
-
-        const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner });
-        if (!file) return res.status(404).json({ error: "Not found" });
-
-        if (typeof fileName === "string") file.fileName = fileName.slice(0, 200);
-        if (typeof note === "string") file.note = note.slice(0, 500);
-
-        await file.save();
-        res.json({ ok: true });
-    });
-
-    app.get("/api/files/:id/download", webAppAuthMiddleware, async (req, res) => {
-        const owner = req.webAppUser.id;
-        const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();
-        if (!file) return res.status(404).json({ error: "Not found" });
-
-        // If you already stored fileSize, handle early
-        if ((file.fileSize || 0) > TG_FILE_MAX) {
-            return res.status(413).json({
-                error: "FILE_TOO_BIG_FOR_DOWNLOAD",
-                detail: "Telegram Bot API cannot download files larger than 50MB. Use /send instead."
-            });
-        }
-
-        try {
-            const token = process.env.BOT_TOKEN;
-
-            const tgFile = await tgGetFile(token, file.tgFileId); // can throw: file is too big
-            const url = tgFileUrl(token, tgFile.file_path);
-
-            const r = await fetch(url);
-            if (!r.ok || !r.body) return res.status(502).json({ error: "Telegram fetch failed" });
-
-            res.setHeader("Content-Type", file.mimeType || "application/octet-stream");
-            const name = file.fileName || "file";
-            res.setHeader("Content-Disposition", `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
-
-            const reader = r.body.getReader();
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                res.write(Buffer.from(value));
-            }
-            res.end();
-        } catch (e) {
-            const msg = String(e?.message || e);
-            if (msg.includes("file is too big")) {
-                return res.status(413).json({
-                    error: "FILE_TOO_BIG_FOR_DOWNLOAD",
-                    detail: "Telegram Bot API cannot download files larger than 50MB. Use /send instead."
-                });
-            }
-            return res.status(500).json({ error: "Server error" });
-        }
-    });
-
-    //  Web users
-    app.post("/api/login/:id", async (req, res) => {
-        const id = req.params.id;
-        if (!id) return res.status(400).json({ error: "ID_REQUIRED" });
-        try {
-            const user = await UserModel.findOne({ refCode: id });
-            if (!user) return res.status(404).json({ error: "User not found" });
-            res.json({ ok: true, user: { id: user.tgUserId, firstName: user.firstName, refCode: user.refCode } });
-        } catch (error) {
-            res.status(500).json({ error: "Server error" });
-        }
-    });
-
-    // SEND to Telegram (by file id). Telegram API is called from backend, so token is safe.
-    function pickTelegramSend(kind) {
-        if (kind === "photo") return { method: "sendPhoto", field: "photo" };
-        if (kind === "video") return { method: "sendVideo", field: "video" };
-        if (kind === "audio") return { method: "sendAudio", field: "audio" };
-        if (kind === "voice") return { method: "sendVoice", field: "voice" };
-        return { method: "sendDocument", field: "document" };
+  // housekeeping: drop expired cache entries and idle rate-limit buckets
+  const sweepTimer = setInterval(() => {
+    try {
+      sweepCaches();
+      sweepLimiters();
+    } catch {
+      /* ignore */
     }
+  }, 5 * 60_000);
+  sweepTimer.unref?.();
 
-    app.post("/api/files/:id/send", webAppAuthMiddleware, async (req, res) => {
-        try {
-            const owner = req.webAppUser.id;
-            const file = await FileModel.findOne({ _id: req.params.id, ownerTgUserId: owner }).lean();
-            if (!file) return res.status(404).json({ error: "Not found" });
+  const port = Number(process.env.PORT || 5000);
+  const host = process.env.HOST || "0.0.0.0";
+  const server = app.listen(port, host, () => {
+    console.log(`🌐 HTTP listening on http://${host}:${port}`);
+    console.log(`   app:   /app      admin: /admin      health: /health`);
+    if (process.env.DEMO_MODE === "true") console.log("   ⚠️  DEMO_MODE is ON — never enable this in production");
+  });
 
-            const token = process.env.BOT_TOKEN;
-            const chatId = owner;
+  server.keepAliveTimeout = 65_000;
+  server.headersTimeout = 70_000;
 
-            const { method, field } = pickTelegramSend(file.kind);
-            const caption = file.note ? String(file.note).slice(0, 1024) : undefined;
+  return { app, server };
+}
 
-            const payload = { chat_id: chatId };
-            payload[field] = file.tgFileId; // file_id
-            if (caption) payload.caption = caption;
-
-            const tgRes = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            }).then(r => r.json());
-
-            if (!tgRes.ok) {
-                return res.status(502).json({ error: "Telegram send failed", detail: tgRes.description });
-            }
-
-            res.json({ ok: true, messageId: tgRes.result?.message_id });
-        } catch (e) {
-            res.status(500).json({ error: "Server error" });
-        }
-    });
-
-    const port = Number(process.env.PORT || 5000);
-    app.listen(port, () => console.log("HTTP on", port));
+/** Utility used by the bot to know whether the web app is reachable. */
+export function publicFileExists(rel) {
+  return fs.existsSync(path.join(PUBLIC_DIR, rel));
 }
