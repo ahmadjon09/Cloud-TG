@@ -1,9 +1,11 @@
-// http/static.js — dependency-free static serving with ETag, gzip cache and immutable URLs
+// http/static.js — dependency-free static serving with ETag, gzip cache and
+// per-build versioned module URLs
 import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import zlib from "zlib";
+import { getBuildHash } from "./pages.js";
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -40,23 +42,25 @@ class AssetStore {
     this.bytes = 0;
   }
 
-  async load(filePath, { compress = true } = {}) {
+  async load(filePath, { compress = true, transform = null, salt = "" } = {}) {
     try {
       const stat = await fsp.stat(filePath);
       const cached = this.entries.get(filePath);
-      if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) return cached;
+      if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size && cached.salt === salt) return cached;
 
-      const raw = await fsp.readFile(filePath);
+      let raw = await fsp.readFile(filePath);
+      if (transform) raw = Buffer.from(transform(raw.toString("utf8"), filePath), "utf8");
       const type = mimeFor(filePath);
       const isText = /^(text\/|application\/(javascript|json|manifest)|image\/svg)/i.test(type);
       const entry = {
         mtimeMs: stat.mtimeMs,
         size: stat.size,
+        salt,
         type,
-        etag: `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}"`,
+        etag: `W/"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}${salt ? "-" + salt : ""}"`,
         raw,
-        gzip: compress && isText && stat.size > 400 ? zlib.gzipSync(raw, { level: 9 }) : null,
-        deflate: compress && isText && stat.size > 400 ? zlib.deflateSync(raw, { level: 9 }) : null
+        gzip: compress && isText && raw.length > 400 ? zlib.gzipSync(raw, { level: 9 }) : null,
+        deflate: compress && isText && raw.length > 400 ? zlib.deflateSync(raw, { level: 9 }) : null
       };
 
       const cost = (entry.raw?.length || 0) + (entry.gzip?.length || 0) + (entry.deflate?.length || 0);
@@ -93,19 +97,16 @@ function storeFor(key) {
   return stores.get(key);
 }
 
-function sendAsset(req, res, entry, { immutable }) {
+function sendAsset(req, res, entry, { cacheable }) {
   const accept = req.headers["accept-encoding"] || "";
   res.setHeader("content-type", entry.type);
   res.setHeader("etag", entry.etag);
   res.setHeader("vary", "accept-encoding");
-  // Never hand out year-long immutable caching: the `?v=` hash is computed at
-  // boot, so two deploys can share a URL. Short TTL + ETag revalidation means a
-  // stale copy heals within minutes at worst (304s keep it cheap).
+  // CODE is always no-store: a stale icon()/el() bundle renders dead SVG
+  // markup, so nothing may reuse it. Images/fonts keep a short TTL.
   res.setHeader(
     "cache-control",
-    immutable
-      ? "public, max-age=3600, must-revalidate"
-      : "public, max-age=300, must-revalidate"
+    cacheable ? "public, max-age=300, must-revalidate" : "no-store"
   );
 
   if (entry.etag && req.headers["if-none-match"] === entry.etag) {
@@ -131,6 +132,21 @@ function sendAsset(req, res, entry, { immutable }) {
  * @param {string} urlPrefix  e.g. "/public"
  * @param {string} rootDir     absolute directory on disk
  */
+/**
+ * Rewrite ES-module import specifiers so EVERY module URL changes per build:
+ *   import { icon } from "./icons.js"
+ *     → import { icon } from "./icons.js?v=a1b2c3d4e5"
+ * No cache layer (browser, service worker, proxy) can then serve a module
+ * that doesn't match the HTML it came with.
+ */
+function versionModuleImports(body, _filePath) {
+  const v = getBuildHash();
+  return body.replace(
+    /(\bfrom\s+|import\s+)["'](\.[^"']+\.m?js)["']/g,
+    (_m, head, spec) => `${head}"${spec}?v=${v}"`
+  );
+}
+
 export function staticHandler(urlPrefix, rootDir, { immutable = false } = {}) {
   const store = storeFor(rootDir);
   const prefix = urlPrefix.endsWith("/") ? urlPrefix.slice(0, -1) : urlPrefix;
@@ -145,17 +161,21 @@ export function staticHandler(urlPrefix, rootDir, { immutable = false } = {}) {
     const filePath = path.resolve(rootDir, rel);
     if (!filePath.startsWith(path.resolve(rootDir) + path.sep)) return next(); // traversal guard
 
-    const entry = await store.load(filePath);
+    const isJs = /\.m?js$/i.test(filePath);
+    const entry = await store.load(filePath, {
+      transform: isJs ? versionModuleImports : null,
+      salt: isJs ? getBuildHash() : ""
+    });
     if (!entry) return next();
 
-    // "?v=..." means the URL changes on deploy → safe to cache forever
-    const isVersioned = Boolean(req.query.v);
-    sendAsset(req, res, entry, { immutable: immutable || isVersioned });
+    const isCode = /\.(m?js|css|json|webmanifest)$/i.test(filePath);
+    // code → no-store (always fresh); images/fonts → short TTL, fine to reuse
+    sendAsset(req, res, entry, { cacheable: !isCode });
   };
 }
 
 /** Serve one specific file (used for /app, /admin, /manifest.webmanifest, /sw.js). */
-export function fileHandler(filePath, { cacheControl = "no-cache", render } = {}) {
+export function fileHandler(filePath, { cacheControl = "no-store", render } = {}) {
   const store = storeFor(path.dirname(filePath));
   return async function serve(req, res, next) {
     const entry = await store.load(filePath);

@@ -93,7 +93,7 @@ export function startServer() {
 
   app.get("/sw.js", (req, res, next) =>
     fileHandler(path.join(PUBLIC_DIR, "sw.js"), {
-      cacheControl: "no-cache",
+      cacheControl: "no-store",
       render: body => body.replace(/\{\{BUILD\}\}/g, getBuildHash())
     })(req, res, next)
   );
