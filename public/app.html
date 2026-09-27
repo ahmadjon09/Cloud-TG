@@ -2,6 +2,23 @@
 <html lang="{{LANG}}">
 
 <head>
+<script>
+  // Build guard: if this HTML's build differs from the one we last ran, reload
+  // once so stale cached JS (old icons/el code) can never keep rendering.
+  (function () {
+    try {
+      var b = "{{BUILD}}";
+      var prev = localStorage.getItem("cloud-build");
+      if (prev && prev !== b && sessionStorage.getItem("cloud-build-reloaded") !== b) {
+        sessionStorage.setItem("cloud-build-reloaded", b);
+        localStorage.setItem("cloud-build", b);
+        location.reload();
+      }
+      localStorage.setItem("cloud-build", b);
+    } catch (e) {}
+  })();
+</script>
+
   <meta charset="utf-8">
   <meta name="viewport"
     content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover, user-scalable=yes">
@@ -12,11 +29,15 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="/manifest.webmanifest">
-  <title>☁️ Cloud</title>
+  <title>Cloud</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link rel="stylesheet" href="/public/css/tokens.css?v={{BUILD}}">
+  <link rel="stylesheet" href="/public/css/icons.css?v={{BUILD}}">
   <link rel="stylesheet" href="/public/css/app.css?v={{BUILD}}">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f8cff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.5 19a4.5 4.5 0 0 0 .5-8.97A6 6 0 0 0 6.2 9.5A3.75 3.75 0 0 0 7 19h10.5Z'/%3E%3C/svg%3E">
+  <link rel="preload" href="/public/fonts/fa-solid-900.woff2?v={{BUILD}}" as="font" type="font/woff2" crossorigin>
+  <link rel="icon" type="image/png" sizes="32x32" href="/public/icons/favicon-32.png?v={{BUILD}}">
+  <link rel="icon" type="image/png" sizes="16x16" href="/public/icons/favicon-16.png?v={{BUILD}}">
+  <link rel="apple-touch-icon" href="/public/icons/icon-192.png?v={{BUILD}}">
 </head>
 
 <body>

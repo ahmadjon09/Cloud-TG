@@ -69,7 +69,7 @@ const CONFIG = {
         document: 50 * 1024 * 1024, video: 50 * 1024 * 1024,
         audio: 50 * 1024 * 1024, voice: 50 * 1024 * 1024, photo: 10 * 1024 * 1024,
     },
-    MEDIA_GROUP_DEBOUNCE: 1500,
+    MEDIA_GROUP_DEBOUNCE: 600, // album parts arrive within ~300ms; 600ms is a safe margin
 };
 
 // ==================== IN-MEMORY CACHE ====================
@@ -108,15 +108,28 @@ function checkRateLimit(userId) {
 // ==================== MEDIA GROUP BATCH ====================
 const mediaGroupMap = new Map();
 
-function addToMediaGroup(uid, fileInfo, onFlush) {
-    if (!mediaGroupMap.has(uid)) mediaGroupMap.set(uid, { timer: null, files: [] });
-    const group = mediaGroupMap.get(uid);
+/**
+ * Batches file messages so a Telegram album saves as one operation.
+ * Single files flush immediately (debounce 0); albums wait just long enough
+ * for the parts to land. Each operation carries ONE "⏳ Saving…" message that
+ * is deleted automatically once the result is posted.
+ */
+const loadingFlags = new Set(); // group keys whose "⏳ Saving…" is already posted
+
+function addToMediaGroup(key, fileInfo, onFlush, debounceMs = CONFIG.MEDIA_GROUP_DEBOUNCE, loadMsg = null) {
+    if (!mediaGroupMap.has(key)) mediaGroupMap.set(key, { timer: null, files: [], loadMsg: null });
+    const group = mediaGroupMap.get(key);
+    if (loadMsg && !group.loadMsg) group.loadMsg = loadMsg;
     group.files.push(fileInfo);
     if (group.timer) clearTimeout(group.timer);
     group.timer = setTimeout(() => {
-        const g = mediaGroupMap.get(uid);
-        if (g) { mediaGroupMap.delete(uid); onFlush(g.files); }
-    }, CONFIG.MEDIA_GROUP_DEBOUNCE);
+        const g = mediaGroupMap.get(key);
+        if (g) {
+            mediaGroupMap.delete(key);
+            loadingFlags.delete(key);
+            Promise.resolve(onFlush(g.files, g.loadMsg)).catch(err => console.error("File flush error:", err.message));
+        }
+    }, debounceMs);
 }
 
 // ==================== UTILS ====================
@@ -149,6 +162,36 @@ const formatTime = (date, tr) => {
 
 const formatError = (err) =>
     `${pe("error", "❌")} <b>Error</b>\n<code>${escapeHtml((err?.message || String(err)).slice(0, 400))}</code>`;
+
+// Telegram file_ids are type-specific: a video/audio/voice file_id sent through
+// sendDocument is rejected ("wrong file identifier"). Always pick the method
+// that matches the stored kind.
+const SEND_AS = {
+    photo: "Photo",
+    video: "Video",
+    audio: "Audio",
+    voice: "Voice",
+    animation: "Animation",
+    document: "Document"
+};
+
+async function replyStoredFile(ctx, file, caption = "") {
+    const opts = { parse_mode: "HTML" };
+    if (caption) opts.caption = String(caption).slice(0, 1024);
+    const suffix = SEND_AS[file.kind] || "Document";
+    const method = `replyWith${suffix}`;
+    if (typeof ctx[method] === "function") return ctx[method](file.tgFileId, opts);
+    return ctx.replyWithDocument(file.tgFileId, opts);
+}
+
+async function sendStoredFileTo(telegram, chatId, file, caption = "") {
+    const opts = { parse_mode: "HTML" };
+    if (caption) opts.caption = String(caption).slice(0, 1024);
+    const suffix = SEND_AS[file.kind] || "Document";
+    const method = `send${suffix}`;
+    if (typeof telegram[method] === "function") return telegram[method](chatId, file.tgFileId, opts);
+    return telegram.sendDocument(chatId, file.tgFileId, opts);
+}
 
 const isAdmin = (id) =>
     process.env.ADMIN_IDS?.split(",").map(s => s.trim()).includes(String(id));
@@ -427,20 +470,45 @@ const KB = {
 
 // ==================== DB INDEXES ====================
 async function ensureIndexes() {
+    const wantedSafe = spec => Object.keys(spec).join("_");
+    /** createIndex that tolerates legacy options: if an index on the same key
+     *  exists with different options (e.g. an old UNIQUE tgFileId index that
+     *  rejects forwarded/shared files), replace it with the wanted options. */
+    async function safeIndex(collection, spec, options = {}) {
+        try {
+            await collection.createIndex(spec, options);
+        } catch (e) {
+            try {
+                const wanted = Object.keys(spec).sort().join("+");
+                const existing = await collection.indexes();
+                for (const idx of existing) {
+                    const key = Object.keys(idx.key || {}).sort().join("+");
+                    if (key !== wanted || idx.name === "_id_") continue;
+                    await collection.dropIndex(idx.name);
+                }
+                await collection.createIndex(spec, options);
+            } catch (e2) {
+                console.warn("Index:", wantedSafe(spec), e2.message);
+            }
+        }
+    }
+
     try {
         await Promise.all([
-            UserModel.collection.createIndex({ tgUserId: 1 }, { unique: true }),
-            UserModel.collection.createIndex({ lastActiveAt: -1 }),
-            UserModel.collection.createIndex({ username: 1 }, { sparse: true }),
-            FileModel.collection.createIndex({ ownerTgUserId: 1, createdAt: -1 }),
-            FileModel.collection.createIndex({ ownerTgUserId: 1, fileName: "text" }),
-            FileModel.collection.createIndex({ tgFileId: 1 }, { unique: true }),
-            FileModel.collection.createIndex({ tgUniqueId: 1 }, { unique: true, sparse: true }),
-            FileModel.collection.createIndex({ kind: 1 }),
-            FileModel.collection.createIndex({ folderId: 1 }),
-            FileModel.collection.createIndex({ isPrivate: 1 }),
-            FileModel.collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
-            FileModel.collection.createIndex({ sharedWith: 1 }),
+            safeIndex(UserModel.collection, { tgUserId: 1 }, { unique: true }),
+            safeIndex(UserModel.collection, { lastActiveAt: -1 }),
+            safeIndex(UserModel.collection, { username: 1 }, { sparse: true }),
+            safeIndex(FileModel.collection, { ownerTgUserId: 1, createdAt: -1 }),
+            safeIndex(FileModel.collection, { ownerTgUserId: 1, fileName: "text" }),
+            // NOT unique: the same file_id / file_unique_id legitimately appears
+            // for different users (forwards) and for identical re-uploads.
+            safeIndex(FileModel.collection, { tgFileId: 1 }),
+            safeIndex(FileModel.collection, { tgUniqueId: 1 }),
+            safeIndex(FileModel.collection, { kind: 1 }),
+            safeIndex(FileModel.collection, { folderId: 1 }),
+            safeIndex(FileModel.collection, { isPrivate: 1 }),
+            safeIndex(FileModel.collection, { expiresAt: 1 }, { expireAfterSeconds: 0 }),
+            safeIndex(FileModel.collection, { sharedWith: 1 }),
         ]);
         console.log("✅ Indexes ready");
     } catch (e) {
@@ -694,8 +762,17 @@ async function setExpiry(uid, fid, dur) {
 }
 
 // ==================== SAVE ONE FILE ====================
+/** Cached user profile (upsertUser keeps it warm) — avoids a DB round-trip per file. */
+async function userPrefs(uid) {
+    const cached = memoryCache.get(`user:${uid}`);
+    if (cached) return cached;
+    const fresh = await UserModel.findOne({ tgUserId: uid }).lean();
+    if (fresh) memoryCache.set(`user:${uid}`, fresh, CONFIG.CACHE_TTL.USER);
+    return fresh;
+}
+
 async function saveOneFile(ctx, uid, obj, kind, caption) {
-    const user = await UserModel.findOne({ tgUserId: uid }).lean();
+    const user = await userPrefs(uid);
     const isPriv = user?.settings?.privateByDefault || false;
     const autoExp = user?.settings?.autoExpire;
 
@@ -704,10 +781,10 @@ async function saveOneFile(ctx, uid, obj, kind, caption) {
             : kind === "video" ? "mp4"
                 : kind === "audio" ? "mp3" : "bin"}`;
 
-    const existing = await FileModel.findOne({ tgFileId: obj.file_id }).lean();
-    if (existing && existing.ownerTgUserId === uid) return { file: existing, duplicate: true };
+    const existing = await FileModel.findOne({ tgFileId: obj.file_id, ownerTgUserId: uid }).lean();
+    if (existing) return { file: existing, duplicate: true };
 
-    const file = await FileModel.create({
+    const doc = {
         ownerTgUserId: uid, kind,
         tgFileId: obj.file_id,
         tgUniqueId: obj.file_unique_id || "",
@@ -718,7 +795,27 @@ async function saveOneFile(ctx, uid, obj, kind, caption) {
         isPrivate: isPriv,
         expiresAt: autoExp && EXPIRY[autoExp] ? new Date(Date.now() + EXPIRY[autoExp]) : null,
         folderId: null,
-    });
+    };
+
+    let file;
+    try {
+        file = await FileModel.create(doc);
+    } catch (e) {
+        // Same content can produce equal file_unique_id values (re-uploads,
+        // forwarded messages) and legacy unique indexes reject them. Treat a
+        // conflict on a file this user already owns as "already saved", and
+        // otherwise save without the unique id.
+        if (e && e.code === 11000) {
+            const dup = await FileModel.findOne({
+                ownerTgUserId: uid,
+                $or: [{ tgFileId: obj.file_id }, ...(obj.file_unique_id ? [{ tgUniqueId: obj.file_unique_id }] : [])]
+            }).lean();
+            if (dup) return { file: dup, duplicate: true };
+            file = await FileModel.create({ ...doc, tgUniqueId: "" });
+        } else {
+            throw e;
+        }
+    }
 
     await UserModel.updateOne(
         { tgUserId: uid },
@@ -867,11 +964,7 @@ ${await tr("help.tip")}
 
             try {
                 const caption = `📤 <b>${escapeHtml(exact.fileName)}</b>\n\n📦 ${formatFileSize(exact.fileSize)} • ${exact.kind.toUpperCase()}\n🕐 ${formatTime(exact.createdAt)}`;
-                if (exact.kind === "photo") {
-                    await ctx.replyWithPhoto(exact.tgFileId, { caption, parse_mode: "HTML" });
-                } else {
-                    await ctx.replyWithDocument(exact.tgFileId, { caption, parse_mode: "HTML" });
-                }
+                await replyStoredFile(ctx, exact, caption);
 
                 // Agar bir nechta natija bo'lsa, qolganlarini ham ko'rsatish
                 if (files.length > 1) {
@@ -1273,11 +1366,7 @@ ${await tr("help.tip")}
         const file = await FileModel.findOne({ _id: ctx.match[1], ownerTgUserId: uid }).lean();
         if (!file) return ctx.reply(await tr("common.notFound"));
         try {
-            if (file.kind === "photo") {
-                await ctx.replyWithPhoto(file.tgFileId, { caption: `<b>${escapeHtml(file.fileName)}</b>`, parse_mode: "HTML" });
-            } else {
-                await ctx.replyWithDocument(file.tgFileId, { caption: `<b>${escapeHtml(file.fileName)}</b>`, parse_mode: "HTML" });
-            }
+            await replyStoredFile(ctx, file, `<b>${escapeHtml(file.fileName)}</b>`);
         } catch (e) {
             console.error("Download error:", e.message);
             await ctx.reply(await tr("common.notModified"));
@@ -1705,11 +1794,7 @@ ${topList}`,
                 const senderName = escapeHtml(ctx.from.first_name || ctx.from.username || "Someone");
                 const caption = `📤 <b>${senderName}</b> shared a file with you:\n\n<code>${escapeHtml(sharedFile.fileName)}</code>\n📦 ${formatFileSize(sharedFile.fileSize)} • ${sharedFile.kind.toUpperCase()}`;
                 try {
-                    if (sharedFile.kind === "photo") {
-                        await ctx.telegram.sendPhoto(target.tgUserId, sharedFile.tgFileId, { caption, parse_mode: "HTML" });
-                    } else {
-                        await ctx.telegram.sendDocument(target.tgUserId, sharedFile.tgFileId, { caption, parse_mode: "HTML" });
-                    }
+                    await sendStoredFileTo(ctx.telegram, target.tgUserId, sharedFile, caption);
                     return ctx.replyWithHTML(await tr("share.shared", { username: escapeHtml(target.username) }), await KB.main(uid));
                 } catch (e) {
                     console.error("Share delivery error:", e.message);
@@ -1741,9 +1826,22 @@ ${topList}`,
             return ctx.reply(await tr("common.fileTooLarge", { size: formatFileSize(max) }));
         }
 
-        const groupKey = m.media_group_id || uid;
+        // Albums are saved as one batch; single files save immediately.
+        const isAlbum = !!m.media_group_id;
+        const groupKey = isAlbum ? `album:${m.media_group_id}` : `save:${uid}:${m.message_id}`;
 
-        addToMediaGroup(groupKey, { uid, ctx, obj, kind, caption: m.caption || "" }, async (batch) => {
+        // ONE "⏳ Saving…" per operation (auto-deleted when the result is posted).
+        // The slot is reserved synchronously so album parts don't each post one.
+        let loadMsg = null;
+        if (!loadingFlags.has(groupKey)) {
+            loadingFlags.add(groupKey);
+            try { loadMsg = await ctx.reply(await tr("files.saving")); } catch { /* ignore */ }
+        }
+
+        addToMediaGroup(groupKey, { uid, ctx, obj, kind, caption: m.caption || "" }, async (batch, load) => {
+            const firstCtx = batch[0].ctx;
+            if (load) await firstCtx.deleteMessage(load.message_id).catch(() => { });
+
             if (batch.length === 1) {
                 const { uid, ctx, obj, kind, caption } = batch[0];
                 const batchTr = await getUserTranslator(uid);
@@ -1771,19 +1869,25 @@ ${topList}`,
                 return;
             }
 
-            // Multiple files batch
-            const firstCtx = batch[0].ctx;
+            // Multiple files batch — save in parallel (DB writes are independent)
             const bUid = batch[0].uid;
             const batchTr = await getUserTranslator(bUid);
             let saved = 0, duplicates = 0, errors = 0;
             const savedFiles = [];
 
-            for (const item of batch) {
-                try {
-                    const { file, duplicate, name } = await saveOneFile(item.ctx, item.uid, item.obj, item.kind, item.caption);
-                    if (duplicate) { duplicates++; }
-                    else { saved++; savedFiles.push({ file, name, kind: item.kind, size: item.obj.file_size || 0 }); }
-                } catch (err) { errors++; console.error("Batch save error:", err.message); }
+            const results = await Promise.all(batch.map(item =>
+                saveOneFile(item.ctx, item.uid, item.obj, item.kind, item.caption)
+                    .then(r => ({ ok: true, r, item }))
+                    .catch(err => ({ ok: false, err, item }))
+            ));
+            for (const res of results) {
+                if (!res.ok) { errors++; console.error("Batch save error:", res.err.message); continue; }
+                const { file, duplicate, name } = res.r;
+                if (duplicate) duplicates++;
+                else {
+                    saved++;
+                    savedFiles.push({ file, name, kind: res.item.kind, size: res.item.obj.file_size || 0 });
+                }
             }
 
             invalidateUser(bUid);
@@ -1798,7 +1902,7 @@ ${topList}`,
             text += `\n\n${await batchTr("files.batchTotal", { count: saved })}`;
 
             await firstCtx.replyWithHTML(text, await KB.main(bUid));
-        });
+        }, isAlbum ? CONFIG.MEDIA_GROUP_DEBOUNCE : 0, loadMsg);
     }
 
     bot.on(["document", "photo", "video", "audio", "voice"], handleFileMessage);

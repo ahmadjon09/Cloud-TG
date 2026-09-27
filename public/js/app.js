@@ -288,7 +288,7 @@ function setView(id, { scrollTop = true } = {}) {
   exitSelection(true);
   closeDrawer();
   dom.viewTitle.textContent = t(viewMeta(id).label);
-  document.title = `☁️ ${t(viewMeta(id).label)}`;
+  document.title = t(viewMeta(id).label);
   renderNav();
   renderChips();
   renderTabs();
@@ -1503,7 +1503,7 @@ function bindEvents() {
   }, 200));
 
   window.addEventListener("keydown", onKeydown);
-  window.addEventListener("unauthorized", () => showFatal(new Error(t("empty.errorText"))));
+  window.addEventListener("cloud:unauthorized", () => showFatal(new Error(t("empty.errorText"))));
   window.addEventListener("online", () => toast(t("app.online"), "success", 1600));
   window.addEventListener("offline", () => toast(t("app.offline"), "warning", 2200));
 
@@ -1602,7 +1602,7 @@ async function main() {
   await loadLanguage(guessLanguage(), { silent: true });
   applyStatic();
   paintStaticIcons();
-  document.title = `☁️ ${t("app.name")}`;
+  document.title = t("app.name");
   dom.viewTitle.textContent = t("nav.all");
 
   if (boot.demo || !tg?.initData) {
@@ -1627,8 +1627,20 @@ async function main() {
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
   if (!window.isSecureContext && location.hostname !== "localhost") return;
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    // A NEW service worker took over → this page may still hold stale modules;
+    // reload once so the fresh build renders (guard avoids reload loops).
+    if (!hadController || reloaded) return;
+    reloaded = true;
+    location.reload();
+  });
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
+    navigator.serviceWorker
+      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .then(reg => reg.update().catch(() => {}))
+      .catch(() => {});
   });
 }
 

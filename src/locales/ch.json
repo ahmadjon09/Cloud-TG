@@ -23,6 +23,7 @@
   "files": {
     "noFiles": "<b>还没有文件</b>\n\n发送任何文件即可保存！\n\n也可以从其他聊天转发。",
     "recentFiles": "<b>最近文件</b>（共 {total} 个）",
+    "saving": "⏳ 正在保存文件…",
     "fileSaved": "<b>文件已保存！</b>",
     "alreadySaved": "<b>已保存！</b>",
     "download": "下载",

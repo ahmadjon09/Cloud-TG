@@ -23,6 +23,7 @@
   "files": {
     "noFiles": "<b>No files yet</b>\n\nSend any file to save it!\n\nForward from other chats too.",
     "recentFiles": "<b>Recent Files</b> ({total} total)",
+    "saving": "⏳ Saving file…",
     "fileSaved": "<b>File Saved!</b>",
     "alreadySaved": "<b>Already saved!</b>",
     "download": "Download",

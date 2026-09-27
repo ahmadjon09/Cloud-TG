@@ -98,9 +98,14 @@ function sendAsset(req, res, entry, { immutable }) {
   res.setHeader("content-type", entry.type);
   res.setHeader("etag", entry.etag);
   res.setHeader("vary", "accept-encoding");
+  // Never hand out year-long immutable caching: the `?v=` hash is computed at
+  // boot, so two deploys can share a URL. Short TTL + ETag revalidation means a
+  // stale copy heals within minutes at worst (304s keep it cheap).
   res.setHeader(
     "cache-control",
-    immutable ? "public, max-age=31536000, immutable" : "public, max-age=300, must-revalidate"
+    immutable
+      ? "public, max-age=3600, must-revalidate"
+      : "public, max-age=300, must-revalidate"
   );
 
   if (entry.etag && req.headers["if-none-match"] === entry.etag) {

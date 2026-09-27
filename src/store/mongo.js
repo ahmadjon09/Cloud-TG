@@ -172,21 +172,42 @@ export function createMongoStore() {
   async function listFiles(opts = {}) {
     const { limit = 40, skip = 0, sort = "newest" } = opts;
     const filter = fileFilter(opts);
-    let items = await FileModel.find(filter)
-      .sort(SORTS[sort] || SORTS.newest)
-      .skip(skip)
-      .limit(limit)
-      .lean();
-    let total = await FileModel.countDocuments(filter);
+    const total = await FileModel.countDocuments(filter);
+
+    // limit === 0 → count-only (used by the counters): never pull whole collections
+    if (limit === 0) return { items: [], total };
 
     // category is derived (kind + extension) — filter in memory for correctness
     if (opts.category) {
       const all = await FileModel.find(filter).sort(SORTS[sort] || SORTS.newest).lean();
       const matched = all.filter(f => categoryOf(f.fileName, f.kind) === opts.category);
-      total = matched.length;
-      items = matched.slice(skip, skip + limit);
+      return { items: matched.slice(skip, skip + limit).map(toPublicFile), total: matched.length };
     }
+
+    const items = await FileModel.find(filter)
+      .sort(SORTS[sort] || SORTS.newest)
+      .skip(skip)
+      .limit(limit)
+      .lean();
     return { items: items.map(toPublicFile), total };
+  }
+
+  /** Single-pass counters for the sidebar badges (`/api/me`, `/api/files/counts`). */
+  async function countByCategory(owner) {
+    const rows = await FileModel.find({ ownerTgUserId: String(owner) })
+      .select("fileName kind isFavorite isDeleted")
+      .lean();
+    const counts = { all: 0, images: 0, videos: 0, audio: 0, documents: 0, archives: 0, favorites: 0, trash: 0 };
+    for (const f of rows) {
+      if (f.isDeleted) {
+        counts.trash++;
+        continue;
+      }
+      counts.all++;
+      counts[categoryOf(f.fileName, f.kind)] = (counts[categoryOf(f.fileName, f.kind)] || 0) + 1;
+      if (f.isFavorite) counts.favorites++;
+    }
+    return counts;
   }
 
   async function getFile(id) {
@@ -394,6 +415,7 @@ export function createMongoStore() {
     listUsers,
     countUsers,
     listFiles,
+    countByCategory,
     getFile,
     getFileOwned,
     createFile,

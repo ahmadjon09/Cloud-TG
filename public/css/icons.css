@@ -1,0 +1,112 @@
+/* =========================================================================
+   icons.css — Font Awesome Free 7 (solid) subset: only the glyphs Cloud uses.
+   Fonts served locally (no CDN) so icons work inside Telegram's iframe,
+   offline and under the strict CSP (font-src 'self').
+   FA Free license: Fonts SIL OFL 1.1, Icons CC BY 4.0, Code MIT.
+   ========================================================================= */
+
+@font-face {
+  font-family: "Font Awesome 7 Free";
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url("/public/fonts/fa-solid-900.woff2") format("woff2");
+}
+
+.fa-solid,
+.fa {
+  font-family: "Font Awesome 7 Free" !important;
+  font-weight: 900;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: middle;
+  line-height: 1;
+  text-rendering: auto;
+  speak: never;
+}
+
+.fa-solid::before,
+.fa::before {
+  content: var(--fa, "");
+}
+
+/* ---- glyph table (subset) ---- */
+.fa-arrow-down-wide-short::before { content: "\f160"; }
+.fa-arrows-rotate::before { content: "\f021"; }
+.fa-backward-step::before { content: "\f048"; }
+.fa-ban::before { content: "\f05e"; }
+.fa-bars::before { content: "\f0c9"; }
+.fa-bell::before { content: "\f0f3"; }
+.fa-bolt::before { content: "\f0e7"; }
+.fa-broom::before { content: "\f51a"; }
+.fa-calendar::before { content: "\f133"; }
+.fa-chart-column::before { content: "\e0e3"; }
+.fa-check::before { content: "\f00c"; }
+.fa-chevron-down::before { content: "\f078"; }
+.fa-chevron-left::before { content: "\f053"; }
+.fa-chevron-right::before { content: "\f054"; }
+.fa-circle-info::before { content: "\f05a"; }
+.fa-clock::before { content: "\f017"; }
+.fa-cloud::before { content: "\f0c2"; }
+.fa-compress::before { content: "\f066"; }
+.fa-copy::before { content: "\f0c5"; }
+.fa-crown::before { content: "\f521"; }
+.fa-download::before { content: "\f019"; }
+.fa-ellipsis::before { content: "\f141"; }
+.fa-expand::before { content: "\f065"; }
+.fa-eye::before { content: "\f06e"; }
+.fa-file-code::before { content: "\f1c9"; }
+.fa-file-excel::before { content: "\f1c3"; }
+.fa-file-lines::before { content: "\f15c"; }
+.fa-file-pdf::before { content: "\f1c1"; }
+.fa-file-powerpoint::before { content: "\f1c4"; }
+.fa-file-word::before { content: "\f1c2"; }
+.fa-file-zipper::before { content: "\f1c6"; }
+.fa-file::before { content: "\f15b"; }
+.fa-film::before { content: "\f008"; }
+.fa-filter::before { content: "\f0b0"; }
+.fa-folder-open::before { content: "\f07c"; }
+.fa-folder::before { content: "\f07b"; }
+.fa-forward-step::before { content: "\f051"; }
+.fa-gear::before { content: "\f013"; }
+.fa-globe::before { content: "\f0ac"; }
+.fa-headset::before { content: "\f590"; }
+.fa-house::before { content: "\f015"; }
+.fa-image::before { content: "\f03e"; }
+.fa-keyboard::before { content: "\f11c"; }
+.fa-link::before { content: "\f0c1"; }
+.fa-list::before { content: "\f03a"; }
+.fa-lock::before { content: "\f023"; }
+.fa-magnifying-glass-minus::before { content: "\f010"; }
+.fa-magnifying-glass-plus::before { content: "\f00e"; }
+.fa-magnifying-glass::before { content: "\f002"; }
+.fa-moon::before { content: "\f186"; }
+.fa-music::before { content: "\f001"; }
+.fa-note-sticky::before { content: "\f249"; }
+.fa-paper-plane::before { content: "\f1d8"; }
+.fa-pause::before { content: "\f04c"; }
+.fa-pen-to-square::before { content: "\f044"; }
+.fa-play::before { content: "\f04b"; }
+.fa-plus::before { content: "\+"; }
+.fa-repeat::before { content: "\f363"; }
+.fa-right-from-bracket::before { content: "\f2f5"; }
+.fa-rotate-left::before { content: "\f2ea"; }
+.fa-server::before { content: "\f233"; }
+.fa-shield-halved::before { content: "\f3ed"; }
+.fa-shuffle::before { content: "\f074"; }
+.fa-star::before { content: "\f005"; }
+.fa-sun::before { content: "\f185"; }
+.fa-table-cells-large::before { content: "\f009"; }
+.fa-tower-broadcast::before { content: "\f519"; }
+.fa-trash::before { content: "\f1f8"; }
+.fa-triangle-exclamation::before { content: "\f071"; }
+.fa-up-right-from-square::before { content: "\f35d"; }
+.fa-upload::before { content: "\f093"; }
+.fa-users::before { content: "\f0c0"; }
+.fa-volume-high::before { content: "\f028"; }
+.fa-volume-xmark::before { content: "\f6a9"; }
+.fa-wand-magic-sparkles::before { content: "\e2ca"; }
+.fa-xmark::before { content: "\f00d"; }

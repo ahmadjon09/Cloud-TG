@@ -16,7 +16,14 @@ export function el(tag, attrs = {}, ...children) {
   }
   for (const c of children.flat()) {
     if (c === null || c === undefined || c === false) continue;
-    node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+    // A markup string (e.g. icon() output) becomes real DOM, not escaped text.
+    if (typeof c === "string" && c.startsWith("<") && c.trimEnd().endsWith(">")) {
+      const tpl = document.createElement("template");
+      tpl.innerHTML = c;
+      node.append(tpl.content);
+    } else {
+      node.append(c instanceof Node ? c : document.createTextNode(String(c)));
+    }
   }
   return node;
 }
@@ -70,16 +77,20 @@ export function formatSize(bytes, digits) {
 }
 
 export function formatDate(value, locale = "en-US", opts = {}) {
+  const d = new Date(value);
+  if (!value || Number.isNaN(d.getTime())) return "—";
   try {
-    return new Date(value).toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric", ...opts });
+    return d.toLocaleDateString(locale, { day: "numeric", month: "short", year: "numeric", ...opts });
   } catch {
     return "";
   }
 }
 
 export function formatDateTime(value, locale = "en-US") {
+  const d = new Date(value);
+  if (!value || Number.isNaN(d.getTime())) return "—";
   try {
-    return new Date(value).toLocaleString(locale, {
+    return d.toLocaleString(locale, {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -93,7 +104,7 @@ export function formatDateTime(value, locale = "en-US") {
 
 export function formatRelative(value, locale = "en-US") {
   const ts = new Date(value).getTime();
-  if (!ts) return "";
+  if (!ts || Number.isNaN(ts)) return "—";
   const diff = Date.now() - ts;
   const min = Math.round(diff / 60000);
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
@@ -151,6 +162,7 @@ export function categoryOf(name = "", kind = "") {
   if (k.includes("image") || k === "photo") return "images";
   if (k.includes("video")) return "videos";
   if (k.includes("audio") || k === "voice") return "audio";
+  if (k.includes("zip") || k.includes("archive") || k.includes("compressed")) return "archives";
   return "documents";
 }
 

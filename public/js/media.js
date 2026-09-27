@@ -394,10 +394,8 @@ function audioPlayer(file, playlist) {
   void prevBtn;
   void backBtn;
 
-  const back = el("button", { class: "ap-btn", "aria-label": t("action.previous") });
-  back.innerHTML = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 5.5v13L8 12l10-6.5ZM6 5v14"/></svg>`;
-  const fwd = el("button", { class: "ap-btn", "aria-label": t("action.next") });
-  fwd.innerHTML = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5.5v13L16 12 6 5.5ZM18 5v14"/></svg>`;
+  const back = el("button", { class: "ap-btn", "aria-label": t("action.previous"), html: icon("stepBack", { size: 19 }) });
+  const fwd = el("button", { class: "ap-btn", "aria-label": t("action.next"), html: icon("stepForward", { size: 19 }) });
   const shuffleBtn = el("button", { class: "ap-btn", "aria-label": t("action.shuffle"), html: icon("shuffle", { size: 18 }) });
   const repeatBtn = el("button", { class: "ap-btn", "aria-label": t("action.loop"), html: icon("repeat", { size: 18 }) });
 
