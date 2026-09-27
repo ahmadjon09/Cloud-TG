@@ -316,7 +316,7 @@ export function apiRouter() {
           return res.json({ ok: true, done: list.length, failed: 0, demo: true, action });
         }
         for (const id of list) {
-          const raw = await store.getFileOwned(id, owner);
+          const raw = await store.getFileForTransfer(id, owner);
           if (!raw) {
             failed++;
             continue;
@@ -345,7 +345,7 @@ export function apiRouter() {
       if (!limit.ok) return res.status(429).json({ error: "Too many requests", code: "RATE_LIMIT" });
 
       const store = getStore();
-      const raw = await store.getFileOwned(req.params.id, req.tgUser.id);
+      const raw = await store.getFileForTransfer(req.params.id, req.tgUser.id);
       if (!raw) return res.status(404).json({ error: "File not found", code: "NOT_FOUND" });
 
       if (!isTelegramConfigured()) {

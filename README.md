@@ -222,8 +222,8 @@ Productionda `DEMO_MODE` ni **hech qachon** yoqmang.
 |---|---|
 | `Missing env vars: BOT_TOKEN, BASE_URL` | `.env` to‘ldirilganini tekshiring |
 | Web app `Not authenticated` | `BASE_URL` HTTPS bo‘lishi kerak; `INIT_DATA_TTL` ni tekshiring |
-| Rasmlar ko‘rinmaydi | Fayl 50 MB dan katta bo‘lmasin; Telegram tokeni to‘g‘riligini tekshiring |
-| Video o‘ynalmaydi | Brauzer kodekni qo‘llab-quvvatlamaydi yoki fayl 50 MB dan katta |
+| Rasmlar ko‘rinmaydi | Web orqali olish chegarasi 20 MB; Telegram tokeni to‘g‘riligini tekshiring |
+| Video o‘ynalmaydi | Brauzer kodekni qo‘llab-quvvatlamaydi yoki fayl 20 MB dan katta |
 | MongoDB ulanmaydi | `MONGO_URI` yoki `DEMO_MODE=true` |
 | Bot buyruqlari ko‘rinmaydi | Bot qayta ishga tushganda buyruqlar avtomatik o‘rnatiladi |
 
@@ -232,3 +232,11 @@ Productionda `DEMO_MODE` ni **hech qachon** yoqmang.
 ## 📄 Litsenziya
 
 ISC
+
+### Web fayllarni tekshirish
+
+`npm test` ro‘yxat, ownership, media token, preview/download, Range va Telegramga
+qayta yuborishni soxta Telegram javoblari bilan tekshiradi (haqiqiy token kerak emas).
+Oddiy Telegram Bot API `getFile` orqali **20 MB gacha** fayl beradi; kattaroq
+fayllar uchun **Telegramga yuborish** tugmasidan foydalaning. Bu botga fayl
+saqlash/yuborish chegarasidan alohida cheklov.

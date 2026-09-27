@@ -438,7 +438,7 @@
       "unsupported": "Aperçu indisponible",
       "unsupportedText": "Ce type de fichier ne peut pas être ouvert ici. Envoyez-le sur Telegram.",
       "tooBig": "Fichier trop volumineux",
-      "tooBigText": "Telegram ne diffuse pas les fichiers de plus de 50 Mo. Envoyez-le plutôt.",
+      "tooBigText": "Telegram ne diffuse pas les fichiers de plus de 20 Mo. Envoyez-le plutôt.",
       "loading": "Chargement…",
       "counter": "{current} sur {total}",
       "openOriginal": "Ouvrir l'original",

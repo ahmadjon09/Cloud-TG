@@ -438,7 +438,7 @@
       "unsupported": "Предпросмотр недоступен",
       "unsupportedText": "Этот тип файла нельзя открыть здесь. Отправьте его в Telegram.",
       "tooBig": "Файл слишком большой",
-      "tooBigText": "Telegram не отдаёт файлы больше 50 МБ. Отправьте файл в Telegram.",
+      "tooBigText": "Telegram не отдаёт файлы больше 20 МБ. Отправьте файл в Telegram.",
       "loading": "Загрузка…",
       "counter": "{current} из {total}",
       "openOriginal": "Открыть оригинал",

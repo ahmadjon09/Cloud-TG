@@ -438,7 +438,7 @@
       "unsupported": "Vista previa no disponible",
       "unsupportedText": "Este tipo de archivo no se puede abrir aquí. Envíalo a Telegram.",
       "tooBig": "El archivo es demasiado grande",
-      "tooBigText": "Telegram no transmite archivos de más de 50 MB. Envíalo a Telegram.",
+      "tooBigText": "Telegram no transmite archivos de más de 20 MB. Envíalo a Telegram.",
       "loading": "Cargando…",
       "counter": "{current} de {total}",
       "openOriginal": "Abrir el original",

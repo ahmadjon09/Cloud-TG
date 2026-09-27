@@ -220,6 +220,13 @@ export function createMongoStore() {
     return toPublicFile(await FileModel.findOne({ _id: id, ownerTgUserId: String(owner) }).lean());
   }
 
+  // Server-only lookup: never include Telegram identifiers in public API JSON.
+  async function getFileForTransfer(id, owner) {
+    if (!String(id).match(/^[a-f\d]{24}$/i)) return null;
+    const doc = await FileModel.findOne({ _id: id, ownerTgUserId: String(owner) }).lean();
+    return doc ? { ...toPublicFile(doc), tgFileId: doc.tgFileId } : null;
+  }
+
   async function createFile(data) {
     const doc = await FileModel.create({
       ownerTgUserId: String(data.ownerId),
@@ -418,6 +425,7 @@ export function createMongoStore() {
     countByCategory,
     getFile,
     getFileOwned,
+    getFileForTransfer,
     createFile,
     updateFile,
     setDeleted,
