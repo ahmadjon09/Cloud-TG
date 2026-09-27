@@ -64,7 +64,14 @@ async function main() {
     }
   }
 
-  keepServerAlive();
+  const ping = keepServerAlive();
+  if (ping) {
+    log(`🔔 Keep-alive ON → pings ${process.env.BASE_URL} every ${Math.round((Number(process.env.PING_INTERVAL_MS || 10 * 60 * 1000) / 60_000))} min`);
+  } else if (process.env.BASE_URL && process.env.DISABLE_PING === "true") {
+    log("🔕 Keep-alive OFF — DISABLE_PING=true. Free-tier hosts (Render/Free Fly) will sleep and cold-start on every open.");
+  } else {
+    log("🔕 Keep-alive OFF — BASE_URL not set. On free-tier hosts the instance will sleep after inactivity.");
+  }
 
   const shutdown = async signal => {
     log(`\n${signal} received — shutting down…`);
