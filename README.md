@@ -92,6 +92,7 @@ Keyin @BotFather’da:
 | `DEMO_MODE` | ⚠️ | `true` → xotiradagi (memory) store. **Productionda YOQMANG** |
 | `BOT_TOKEN_SUP` | ➖ | Qo‘llab-quvvatlash (support) boti uchun alohida token |
 | `INIT_DATA_TTL` | ➖ | initData amal qilish muddati (soniyalarda), standart 86400 |
+| `WEB_SESSION_TTL` | ➖ | Tasdiqlangan Web App sessiyasi muddati (soniyalarda), standart 604800 (7 kun) |
 
 ---
 
@@ -191,7 +192,7 @@ Yangilangan tekshiruv: har bir tilda **545 ta kalit** — barchasi joyida,
 
 ## 🔒 Xavfsizlik
 
-- `initData` — HMAC-SHA256 tekshiruvi (`timingSafeEqual`), TTL va kesh bilan
+- `initData` — HMAC-SHA256 tekshiruvi (`timingSafeEqual`), TTL va kesh bilan; tasdiqlangandan keyin HttpOnly, imzolangan web-sessiya yaratiladi
 - Media linklari — HMAC imzolangan, 6 soat amal qiladi, maqsadi (`preview`/`download`) tekshiriladi
 - Har bir so‘rov `ownerTgUserId` bo‘yicha tekshiriladi — boshqa birovning fayliga yo‘l yo‘q
 - CSP, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`
@@ -222,6 +223,7 @@ Productionda `DEMO_MODE` ni **hech qachon** yoqmang.
 |---|---|
 | `Missing env vars: BOT_TOKEN, BASE_URL` | `.env` to‘ldirilganini tekshiring |
 | Web app `Not authenticated` | `BASE_URL` HTTPS bo‘lishi kerak; `INIT_DATA_TTL` ni tekshiring |
+| `Telegram session expired` | Ilovani yoping va botdagi tugma orqali qayta oching. Yangi Telegram sessiyasi tasdiqlanganda 7 kunlik imzolangan web-sessiya avtomatik yaratiladi. |
 | Rasmlar ko‘rinmaydi | Web orqali olish chegarasi 20 MB; Telegram tokeni to‘g‘riligini tekshiring |
 | Video o‘ynalmaydi | Brauzer kodekni qo‘llab-quvvatlamaydi yoki fayl 20 MB dan katta |
 | MongoDB ulanmaydi | `MONGO_URI` yoki `DEMO_MODE=true` |

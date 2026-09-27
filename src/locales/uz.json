@@ -253,6 +253,13 @@
       "offline": "Internet yo'q",
       "online": "Internet tiklandi"
     },
+    "session": {
+      "requiredTitle": "Cloud'ni Telegram ichida oching",
+      "requiredText": "Xavfsizlik uchun Cloud Telegram sessiyasini talab qiladi. Davom etish uchun uni bot orqali oching.",
+      "expiredTitle": "Telegram sessiyasi tugadi",
+      "expiredText": "Cloud'ni yoping, so'ng bot orqali yana oching. Fayllaringiz xavfsiz.",
+      "closeAndReopen": "Cloud'ni yopib, qayta ochish"
+    },
     "nav": {
       "all": "Barcha fayllar",
       "images": "Rasmlar",

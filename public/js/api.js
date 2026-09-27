@@ -1,8 +1,24 @@
 // api.js — backend client
-import { store } from "./core.js";
 
+/**
+ * Telegram injects fresh initData whenever it opens a Mini App. Do not persist it:
+ * it is a signed, short-lived credential, and an old localStorage value is the
+ * main cause of a misleading "Session expired" screen after reopening Cloud.
+ */
 function initData() {
-  return window.Telegram?.WebApp?.initData || store.get("initData", "") || "";
+  return String(window.Telegram?.WebApp?.initData || "");
+}
+
+let authFailureReported = false;
+
+function reportUnauthorized(error) {
+  if (authFailureReported) return;
+  authFailureReported = true;
+  try {
+    window.dispatchEvent?.(new CustomEvent("cloud:unauthorized", { detail: error }));
+  } catch {
+    /* The API is also imported by non-browser tests. */
+  }
 }
 
 async function request(path, { method = "GET", body, headers = {}, raw = false, timeout = 25000 } = {}) {
@@ -10,7 +26,7 @@ async function request(path, { method = "GET", body, headers = {}, raw = false, 
   const timer = setTimeout(() => controller.abort(), timeout);
   const opts = {
     method,
-    headers: { accept: "application/json", ...headers },
+    headers: { accept: "application/json", "x-cloud-session": "1", ...headers },
     signal: controller.signal,
     credentials: "same-origin"
   };
@@ -23,8 +39,15 @@ async function request(path, { method = "GET", body, headers = {}, raw = false, 
   try {
     const res = await fetch(path, opts);
     if (res.status === 401) {
-      window.dispatchEvent(new CustomEvent("cloud:unauthorized"));
-      throw new ApiError("Session expired", 401, "NOT_AUTHENTICATED");
+      const payload = await res.json().catch(() => ({}));
+      const error = new ApiError(
+        payload.error || "Telegram session expired",
+        401,
+        payload.code || "NOT_AUTHENTICATED",
+        payload
+      );
+      reportUnauthorized(error);
+      throw error;
     }
     if (raw) return res;
     const payload = await res.json().catch(() => ({}));

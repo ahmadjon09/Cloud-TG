@@ -253,6 +253,13 @@
       "offline": "网络已断开",
       "online": "网络已恢复"
     },
+    "session": {
+      "requiredTitle": "请在 Telegram 中打开 Cloud",
+      "requiredText": "为保障安全，Cloud 需要 Telegram 会话。请从机器人中打开应用后继续。",
+      "expiredTitle": "Telegram 会话已过期",
+      "expiredText": "请关闭 Cloud，再从机器人中重新打开。您的文件仍然安全。",
+      "closeAndReopen": "关闭并重新打开 Cloud"
+    },
     "nav": {
       "all": "全部文件",
       "images": "图片",

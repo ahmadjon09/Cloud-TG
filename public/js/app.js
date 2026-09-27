@@ -35,6 +35,7 @@ const state = {
   selected: new Set(),
   selectionMode: false,
   ready: false,
+  authExpired: false,
   theme: store.get("theme", "auto"),
   desktopMode: store.get("desktopMode", null), // null = auto
   autoFullscreen: store.get("autoFullscreen", true),
@@ -203,7 +204,9 @@ function initTelegram() {
     tg.expand();
     tg.enableClosingConfirmation?.();
     tg.disableVerticalSwipes?.();
-    if (tg.initData) store.set("initData", tg.initData);
+    // initData is a short-lived Telegram credential. Older versions persisted it
+    // in localStorage, which made a reopened Mini App reuse an expired session.
+    store.del("initData");
     tg.onEvent?.("themeChanged", () => applyTheme(state.theme));
     tg.onEvent?.("viewportChanged", () => applyDesktopMode());
     tg.BackButton?.onClick?.(() => {
@@ -323,6 +326,7 @@ function closeDrawer() {
 
 /* ============================================================ data */
 async function loadMe() {
+  if (state.authExpired) return false;
   try {
     const me = await api.me();
     state.user = me.user;
@@ -333,13 +337,17 @@ async function loadMe() {
       await loadLanguage(me.user.language);
       renderAll();
     }
+    return true;
   } catch (e) {
     console.error("[me]", e);
-    showFatal(e);
+    if (isAuthenticationError(e)) showAuthenticationRequired(e);
+    else showFatal(e);
+    return false;
   }
 }
 
 async function loadCounts() {
+  if (state.authExpired) return;
   try {
     const res = await api.counts();
     state.counts = res.counts || {};
@@ -379,6 +387,71 @@ function applyUser() {
   );
 }
 
+function isAuthenticationError(error) {
+  return error?.status === 401 || ["NO_INIT_DATA", "INIT_DATA_EXPIRED", "BAD_INIT_DATA", "NOT_AUTHENTICATED"].includes(error?.code);
+}
+
+function reopenTelegramSession() {
+  // Telegram cannot refresh initData inside an existing WebView. Closing it and
+  // launching Cloud from the bot makes Telegram provide a fresh signed payload.
+  try {
+    if (tg?.close) {
+      tg.close();
+      return;
+    }
+  } catch { /* continue with the browser fallback */ }
+
+  const username = String(boot.botUsername || "").replace(/^@/, "").trim();
+  if (username) {
+    const url = `https://t.me/${username}`;
+    try {
+      if (tg?.openTelegramLink) {
+        tg.openTelegramLink(url);
+        return;
+      }
+    } catch { /* ordinary browser fallback below */ }
+    window.location.assign(url);
+    return;
+  }
+  window.location.reload();
+}
+
+function showAuthenticationRequired(error) {
+  if (state.authExpired) return;
+  state.authExpired = true;
+  state.ready = false;
+  state.loading = false;
+  fileRequest++;
+  closeContextMenu();
+  closeDrawer();
+
+  const expired = error?.code === "INIT_DATA_EXPIRED";
+  const hasTelegram = Boolean(tg?.close);
+  const canOpenBot = Boolean(String(boot.botUsername || "").trim());
+  const buttonLabel = hasTelegram
+    ? t("session.closeAndReopen")
+    : canOpenBot
+      ? t("action.openBot")
+      : t("action.retry");
+  const action = el(
+    "button",
+    { class: "btn btn-primary", style: { marginTop: "14px" }, type: "button" },
+    icon(hasTelegram ? "logout" : (canOpenBot ? "external" : "refresh"), { size: 16 }),
+    el("span", { text: buttonLabel })
+  );
+  action.addEventListener("click", reopenTelegramSession);
+
+  dom.content.innerHTML = "";
+  dom.content.append(
+    emptyState({
+      iconName: "warning",
+      title: t(expired ? "session.expiredTitle" : "session.requiredTitle"),
+      text: t(expired ? "session.expiredText" : "session.requiredText"),
+      action
+    })
+  );
+}
+
 function showFatal(error) {
   const demo = boot.demo;
   dom.content.innerHTML = "";
@@ -402,7 +475,7 @@ function showFatal(error) {
 
 let fileRequest = 0;
 async function refreshFiles({ reset = true } = {}) {
-  if (state.view === "settings" || state.view === "admin") return;
+  if (state.authExpired || state.view === "settings" || state.view === "admin") return;
   const requestId = ++fileRequest;
   let failed = false;
   if (reset) {
@@ -432,7 +505,8 @@ async function refreshFiles({ reset = true } = {}) {
     if (requestId !== fileRequest) return;
     failed = true;
     console.error("[files]", e);
-    if (state.files.length === 0) showFatal(e);
+    if (isAuthenticationError(e)) showAuthenticationRequired(e);
+    else if (state.files.length === 0) showFatal(e);
     else toast(e.message || t("toast.failed"), "error");
   } finally {
     if (requestId === fileRequest) {
@@ -443,7 +517,7 @@ async function refreshFiles({ reset = true } = {}) {
 }
 
 async function loadMore() {
-  if (state.loading || !state.hasMore || state.view === "settings") return;
+  if (state.authExpired || state.loading || !state.hasMore || state.view === "settings") return;
   const requestId = fileRequest;
   state.loading = true;
   renderLoadMore();
@@ -464,7 +538,8 @@ async function loadMore() {
     state.skip = state.files.length;
   } catch (e) {
     if (requestId !== fileRequest) return;
-    toast(e.message || t("toast.failed"), "error");
+    if (isAuthenticationError(e)) showAuthenticationRequired(e);
+    else toast(e.message || t("toast.failed"), "error");
   } finally {
     if (requestId === fileRequest) {
       state.loading = false;
@@ -1488,8 +1563,8 @@ function bindEvents() {
   dom.sidebarClose.addEventListener("click", closeDrawer);
   dom.refreshBtn.addEventListener("click", async () => {
     haptic("light");
-    await Promise.all([refreshFiles(), loadCounts(), loadMe()]);
-    toast(t("header.updated"), "success", 1400);
+    const [, , loaded] = await Promise.all([refreshFiles(), loadCounts(), loadMe()]);
+    if (loaded) toast(t("header.updated"), "success", 1400);
   });
   dom.viewBtn.addEventListener("click", () => {
     state.mode = state.mode === "grid" ? "list" : "grid";
@@ -1518,7 +1593,7 @@ function bindEvents() {
   }, 200));
 
   window.addEventListener("keydown", onKeydown);
-  window.addEventListener("cloud:unauthorized", () => showFatal(new Error(t("empty.errorText"))));
+  window.addEventListener("cloud:unauthorized", event => showAuthenticationRequired(event.detail));
   window.addEventListener("online", () => toast(t("app.online"), "success", 1600));
   window.addEventListener("offline", () => toast(t("app.offline"), "warning", 2200));
 
@@ -1608,6 +1683,9 @@ function paintStaticIcons() {
 }
 
 async function main() {
+  // Remove the short-lived credential left by older Cloud versions even when
+  // this page is opened outside Telegram.
+  store.del("initData");
   paintStaticIcons();
   initTelegram();
   applyTheme(state.theme);
@@ -1620,14 +1698,15 @@ async function main() {
   document.title = t("app.name");
   dom.viewTitle.textContent = t("nav.all");
 
-  if (boot.demo || !tg?.initData) {
+  if (boot.demo) {
     dom.toolbar.after(
       el("div", { class: "banner is-info" }, icon("info", { size: 16 }), el("span", { text: t("header.demo") }))
     );
   }
 
   registerServiceWorker();
-  await loadMe();
+  const authenticated = await loadMe();
+  if (!authenticated) return;
   state.ready = true;
   renderAll();
   loadCounts();
@@ -1669,7 +1748,8 @@ function registerServiceWorker() {
 
 main().catch(err => {
   console.error("[app]", err);
-  showFatal(err);
+  if (isAuthenticationError(err)) showAuthenticationRequired(err);
+  else showFatal(err);
 });
 
 export { state, refreshFiles, loadCounts };
