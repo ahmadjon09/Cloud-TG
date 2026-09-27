@@ -23,6 +23,7 @@
   "files": {
     "noFiles": "<b>Hali fayllar yo'q</b>\n\nSaqlash uchun istalgan faylni yuboring!\n\nBoshqa chatlardan ham forward qilishingiz mumkin.",
     "recentFiles": "<b>So'nggi fayllar</b> (jami {total})",
+    "saving": "⏳ Fayl saqlanmoqda…",
     "fileSaved": "<b>Fayl saqlandi!</b>",
     "alreadySaved": "<b>Avval saqlangan!</b>",
     "download": "Yuklab olish",

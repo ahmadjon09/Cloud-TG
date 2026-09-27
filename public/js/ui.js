@@ -378,6 +378,10 @@ export function avatarOf(user, size = 36) {
         .map(p => p[0])
         .join("")
         .toUpperCase()
-    : "☁";
-  return el("span", { class: "avatar", style: { width: `${size}px`, height: `${size}px`, fontSize: `${size / 2.6}px` }, text: escapeHtml(initials) });
+    : null;
+  return el(
+    "span",
+    { class: "avatar", style: { width: `${size}px`, height: `${size}px`, fontSize: `${size / 2.6}px` } },
+    initials ? el("span", { text: initials }) : icon("cloud", { size: Math.round(size / 2.2) })
+  );
 }

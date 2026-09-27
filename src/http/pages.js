@@ -64,7 +64,7 @@ function render(template, tokens) {
  * @param {string} file  absolute path to the HTML template
  * @param {object} opts  { extra: (req) => object, cacheControl }
  */
-export function pageHandler(file, { extra, cacheControl = "no-cache", title } = {}) {
+export function pageHandler(file, { extra, cacheControl = "no-store", title } = {}) {
   const template = fs.readFileSync(file, "utf8");
   return function handler(req, res) {
     const boot = { ...bootPayload(req), ...(typeof extra === "function" ? extra(req) : {}) };

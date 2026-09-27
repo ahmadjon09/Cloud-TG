@@ -343,6 +343,15 @@ ul {
   width: 100%;
 }
 
+/* Icon glyphs (Font Awesome subset) — never stretch/shrink inside flex rows */
+.icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  vertical-align: middle;
+  align-self: center;
+  pointer-events: none;
+}
+
 .icon-btn {
   display: inline-flex;
   align-items: center;

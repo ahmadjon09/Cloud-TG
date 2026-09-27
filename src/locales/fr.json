@@ -23,6 +23,7 @@
   "files": {
     "noFiles": "<b>Aucun fichier pour le moment</b>\n\nEnvoyez n'importe quel fichier pour le sauvegarder !\n\nVous pouvez aussi transférer depuis d'autres discussions.",
     "recentFiles": "<b>Fichiers Récents</b> ({total} au total)",
+    "saving": "⏳ Enregistrement du fichier…",
     "fileSaved": "<b>Fichier Enregistré !</b>",
     "alreadySaved": "<b>Déjà enregistré !</b>",
     "download": "Télécharger",

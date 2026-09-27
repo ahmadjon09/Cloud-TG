@@ -23,6 +23,7 @@
   "files": {
     "noFiles": "<b>Aún no hay archivos</b>\n\n¡Envía cualquier archivo para guardarlo!\n\nTambién puedes reenviar desde otros chats.",
     "recentFiles": "<b>Archivos Recientes</b> ({total} en total)",
+    "saving": "⏳ Guardando archivo…",
     "fileSaved": "<b>¡Archivo Guardado!</b>",
     "alreadySaved": "<b>¡Ya guardado!</b>",
     "download": "Descargar",

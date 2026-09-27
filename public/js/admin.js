@@ -499,9 +499,9 @@ async function renderBroadcast() {
       el("div", { class: "bc-item" },
         el("div", { class: "bc-item-head" },
           el("span", { text: formatDateTime(item.startedAt, htmlLang()) }),
-          el("span", { text: `✅ ${item.sent}` }),
-          el("span", { text: `❌ ${item.failed}` }),
-          el("span", { text: `🚫 ${item.blocked}` }),
+          el("span", {}, icon("check", { size: 13, style: "color:var(--success)" }), ` ${item.sent}`),
+          el("span", {}, icon("close", { size: 13, style: "color:var(--danger)" }), ` ${item.failed}`),
+          el("span", {}, icon("block", { size: 13, style: "color:var(--warning)" }), ` ${item.blocked}`),
           el("span", { text: t("admin.broadcastBy", { name: item.by || "admin" }) })),
         el("div", { class: "bc-item-text", text: item.text })
       )

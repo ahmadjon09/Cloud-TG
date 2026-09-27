@@ -75,11 +75,7 @@ export function apiRouter() {
       }
 
       const stats = await store.userStats(tg.id);
-      const counts = {};
-      for (const cat of ["images", "videos", "audio", "documents", "archives"]) {
-        const r = await store.listFiles({ owner: tg.id, category: cat, limit: 0 });
-        counts[cat] = r.total;
-      }
+      const counts = await store.countByCategory(tg.id);
 
       res.json({
         ok: true,
@@ -201,14 +197,7 @@ export function apiRouter() {
       const cached = caches.stats.get(key);
       if (cached) return res.json({ ok: true, ...cached });
 
-      const counts = { all: 0, images: 0, videos: 0, audio: 0, documents: 0, archives: 0, favorites: 0, trash: 0 };
-      const all = await store.listFiles({ owner: req.tgUser.id, limit: Number.MAX_SAFE_INTEGER });
-      for (const f of all.items) {
-        counts[f.category] = (counts[f.category] || 0) + 1;
-        if (f.isFavorite) counts.favorites++;
-        if (f.isDeleted) counts.trash++;
-        else counts.all++;
-      }
+      const counts = await store.countByCategory(req.tgUser.id);
       const payload = { counts, generatedAt: Date.now() };
       caches.stats.set(key, payload, 20_000);
       res.json({ ok: true, ...payload });

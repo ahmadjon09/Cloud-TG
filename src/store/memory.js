@@ -352,6 +352,23 @@ export function createMemoryStore({ seed = true, demoUserId = "100000001" } = {}
     return { items: matched.slice(skip, skip + limit).map(publicFile), total: matched.length };
   }
 
+  /** Single-pass counters for the sidebar badges (`/api/me`, `/api/files/counts`). */
+  async function countByCategory(owner) {
+    const counts = { all: 0, images: 0, videos: 0, audio: 0, documents: 0, archives: 0, favorites: 0, trash: 0 };
+    for (const f of files.values()) {
+      if (String(f.ownerTgUserId) !== String(owner)) continue;
+      if (f.isDeleted) {
+        counts.trash++;
+        continue;
+      }
+      counts.all++;
+      const cat = categoryOf(f.fileName, f.kind);
+      counts[cat] = (counts[cat] || 0) + 1;
+      if (f.isFavorite) counts.favorites++;
+    }
+    return counts;
+  }
+
   async function getFile(id) {
     return publicFile(files.get(String(id)));
   }
@@ -575,6 +592,7 @@ export function createMemoryStore({ seed = true, demoUserId = "100000001" } = {}
     listUsers,
     countUsers,
     listFiles,
+    countByCategory,
     getFile,
     getFileOwned,
     createFile,
