@@ -118,12 +118,30 @@ function verifyCached(initData, token, ttl) {
   return result;
 }
 
+// Throttled diagnostic log so a broken setup is visible in the host logs
+// (one line per distinct initData per minute — enough to diagnose, no spam).
+const rejectLogSeen = new Map();
+function logReject(initData, code, detail = "") {
+  const key = crypto.createHash("sha256").update(String(initData)).digest("hex");
+  const last = rejectLogSeen.get(key);
+  if (last && Date.now() - last < 60_000) return;
+  if (rejectLogSeen.size > 500) rejectLogSeen.clear();
+  rejectLogSeen.set(key, Date.now());
+  console.warn(`[auth] initData rejected: ${code}${detail ? ` (${detail})` : ""}`);
+}
+
 function verifyOnce(initData, token, ttl) {
   const v = checkHmac(initData, token);
-  if (!v.ok) return { ok: false, error: "Invalid initData", reason: v.reason, code: v.code || "BAD_INIT_DATA" };
+  if (!v.ok) {
+    // "Bot token missing" is a server misconfiguration; the other two mean the
+    // payload does not match the configured BOT_TOKEN (regenerated/typo).
+    logReject(initData, v.code || "BAD_INIT_DATA", v.reason === "Bad hash" ? "HMAC mismatch — check BOT_TOKEN in the server env" : v.reason);
+    return { ok: false, error: "Invalid initData", reason: v.reason, code: v.code || "BAD_INIT_DATA" };
+  }
 
   const authDate = Number(v.data.auth_date || 0);
   if (!Number.isSafeInteger(authDate) || authDate <= 0) {
+    logReject(initData, "BAD_INIT_DATA", "missing auth_date");
     return { ok: false, error: "Missing auth_date", code: "BAD_INIT_DATA" };
   }
 
@@ -131,18 +149,24 @@ function verifyOnce(initData, token, ttl) {
   try {
     user = normalizeUser(v.data.user ? JSON.parse(v.data.user) : null);
   } catch {
+    logReject(initData, "BAD_INIT_DATA", "malformed user payload");
     return { ok: false, error: "Malformed user payload", code: "BAD_INIT_DATA" };
   }
-  if (!user) return { ok: false, error: "No user in initData", code: "BAD_INIT_DATA" };
+  if (!user) {
+    logReject(initData, "BAD_INIT_DATA", "no user in initData");
+    return { ok: false, error: "No user in initData", code: "BAD_INIT_DATA" };
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const age = now - authDate;
   if (age > ttl) {
     // The HMAC and user are still valid. Keeping the user here lets us safely
     // continue an existing same-user server session without cross-account reuse.
+    logReject(initData, "INIT_DATA_EXPIRED", `age=${Math.round(age / 60)}min ttl=${Math.round(ttl / 60)}min — if the user just opened the app, the server clock or INIT_DATA_TTL is wrong`);
     return { ok: false, error: "initData expired", code: "INIT_DATA_EXPIRED", authDate, user };
   }
   if (age < -CLOCK_SKEW) {
+    logReject(initData, "BAD_INIT_DATA", `auth_date in the future by ${Math.round(-age / 60)}min — server clock is behind`);
     return { ok: false, error: "Invalid auth_date", code: "BAD_INIT_DATA" };
   }
 
