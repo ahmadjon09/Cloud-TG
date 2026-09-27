@@ -1,8 +1,9 @@
 import mongoose from "mongoose";
 
-const FileSchema = new mongoose.Schema({
+const FileSchema = new mongoose.Schema(
+  {
     ownerTgUserId: { type: String, required: true, index: true },
-    kind: { type: String, required: true },
+    kind: { type: String, required: true, default: "document" },
     tgFileId: { type: String, required: true },
     tgUniqueId: { type: String, default: "" },
     fileName: { type: String, default: "" },
@@ -11,17 +12,21 @@ const FileSchema = new mongoose.Schema({
     note: { type: String, maxlength: 500, default: "" },
 
     // Features
-    isPrivate: { type: Boolean, default: false },
-    isDeleted: { type: Boolean, default: false },
+    isPrivate: { type: Boolean, default: false, index: true },
+    isFavorite: { type: Boolean, default: false, index: true },
+    isDeleted: { type: Boolean, default: false, index: true },
     deletedAt: Date,
-    folderId: String,
-    expiresAt: { type: Date, index: { expireAfterSeconds: 0 } },
-    sharedWith: [String],
-    updatedAt: { type: Date, default: Date.now }
-}, { timestamps: true });
+    folderId: { type: String, default: null },
+    expiresAt: { type: Date, default: null, index: { expireAfterSeconds: 0 } },
+    sharedWith: { type: [String], default: [] }
+  },
+  { timestamps: true }
+);
 
-// Optimized indexes
-FileSchema.index({ ownerTgUserId: 1, createdAt: -1 });
+// Most used query: "files of a user, newest first, not deleted"
+FileSchema.index({ ownerTgUserId: 1, isDeleted: 1, createdAt: -1 });
 FileSchema.index({ ownerTgUserId: 1, fileName: "text" });
+FileSchema.index({ ownerTgUserId: 1, isFavorite: 1, createdAt: -1 });
+FileSchema.index({ createdAt: -1 });
 
 export const FileModel = mongoose.model("File", FileSchema);
