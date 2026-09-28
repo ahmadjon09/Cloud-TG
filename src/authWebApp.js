@@ -100,9 +100,7 @@ export function checkHmac(initData, botToken) {
   if (!hash) return { ok: false, reason: "No hash", code: "BAD_INIT_DATA" };
 
   delete data.hash;
-  // signature belongs to Telegram's third-party public-key validation and is
-  // intentionally excluded from the bot-token HMAC data-check string.
-  delete data.signature;
+  // delete data.signature;
 
   const dataCheckString = Object.keys(data)
     .sort()
