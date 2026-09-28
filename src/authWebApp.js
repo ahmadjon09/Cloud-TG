@@ -64,7 +64,34 @@ function normalizeUser(raw) {
   };
 }
 
+function cleanToken(raw) {
+  // Hosting panels often keep surrounding quotes/whitespace/newlines in env values.
+  return String(raw || "").trim().replace(/^['"]|['"]$/g, "").trim();
+}
+
+/** Every bot token that may legitimately open this Mini App (main bot first). */
+export function webAppTokens() {
+  const list = [process.env.BOT_TOKEN, ...String(process.env.WEBAPP_BOT_TOKENS || "").split(","), process.env.BOT_TOKEN_SUP]
+    .map(cleanToken)
+    .filter(Boolean);
+  return [...new Set(list)];
+}
+
+function primaryToken() {
+  return cleanToken(process.env.BOT_TOKEN);
+}
+
 export function checkHmac(initData, botToken) {
+  if (Array.isArray(botToken)) {
+    if (!botToken.length) return checkHmac(initData, "");
+    let last;
+    for (const t of botToken) {
+      last = checkHmac(initData, t);
+      if (last.ok || last.reason !== "Bad hash") return last;
+    }
+    return last;
+  }
+  botToken = cleanToken(botToken);
   if (!initData) return { ok: false, reason: "No initData", code: "NO_INIT_DATA" };
   if (!botToken) return { ok: false, reason: "Server misconfigured: BOT_TOKEN missing", code: "AUTH_UNAVAILABLE" };
 
@@ -100,7 +127,7 @@ const VERIFY_CACHE_MAX = 5000;
 function verifyCached(initData, token, ttl) {
   const key = crypto
     .createHash("sha256")
-    .update(`${token}\u0000${ttl}\u0000${initData}`)
+    .update(`${[].concat(token).join(",")}\u0000${ttl}\u0000${initData}`)
     .digest("hex");
   const hit = verifyCache.get(key);
   const now = Math.floor(Date.now() / 1000);
@@ -135,7 +162,14 @@ function verifyOnce(initData, token, ttl) {
   if (!v.ok) {
     // "Bot token missing" is a server misconfiguration; the other two mean the
     // payload does not match the configured BOT_TOKEN (regenerated/typo).
-    logReject(initData, v.code || "BAD_INIT_DATA", v.reason === "Bad hash" ? "HMAC mismatch — check BOT_TOKEN in the server env" : v.reason);
+    const botIds = (Array.isArray(token) ? token : [token]).map(t => String(t).split(":")[0]).join(",");
+    logReject(
+      initData,
+      v.code || "BAD_INIT_DATA",
+      v.reason === "Bad hash"
+        ? `HMAC mismatch — the Mini App was opened from a bot whose token is not configured (checked bot ids: ${botIds}). Open it from this bot, or add that bot's token to WEBAPP_BOT_TOKENS`
+        : v.reason
+    );
     return { ok: false, error: "Invalid initData", reason: v.reason, code: v.code || "BAD_INIT_DATA" };
   }
 
@@ -340,13 +374,14 @@ function authError(res, result, fallback = "NO_INIT_DATA") {
  * one-day Telegram payload expires; a fresh Telegram payload always takes priority.
  */
 export function webAppAuthMiddleware(req, res, next) {
-  const token = process.env.BOT_TOKEN;
+  const token = primaryToken();
+  const tokens = webAppTokens();
   const ttl = initDataTtl();
   const initData = initDataFrom(req);
 
   if (!initData && process.env.DEMO_MODE === "true" && !token) return attach(req, demoUser(req), next, "demo");
 
-  const initResult = initData ? verifyCached(initData, token, ttl) : null;
+  const initResult = initData ? verifyCached(initData, tokens, ttl) : null;
   if (initResult?.ok) {
     setWebSession(res, req, initResult, token);
     return attach(req, initResult, next, "telegram");
@@ -362,13 +397,14 @@ export function webAppAuthMiddleware(req, res, next) {
 
 /** Same as above but never blocks: `req.tgUser` may be null. */
 export function optionalWebAppAuth(req, res, next) {
-  const token = process.env.BOT_TOKEN;
+  const token = primaryToken();
+  const tokens = webAppTokens();
   const ttl = initDataTtl();
   const initData = initDataFrom(req);
 
   if (!initData && process.env.DEMO_MODE === "true" && !token) return attach(req, demoUser(req), next, "demo");
 
-  const initResult = initData ? verifyCached(initData, token, ttl) : null;
+  const initResult = initData ? verifyCached(initData, tokens, ttl) : null;
   if (initResult?.ok) {
     setWebSession(res, req, initResult, token);
     return attach(req, initResult, next, "telegram");
