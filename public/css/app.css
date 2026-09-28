@@ -1,14 +1,9 @@
-/* =========================================================================
-   app.css — layout + components for the Cloud web app
-   ========================================================================= */
-
-/* ------------------------------------------------------------- app shell */
 .app {
   min-height: 100dvh;
   display: flex;
   background:
-    radial-gradient(1200px 600px at 100% -10%, rgba(79, 140, 255, .13), transparent 60%),
-    radial-gradient(900px 500px at -10% 0%, rgba(124, 92, 255, .10), transparent 55%),
+    radial-gradient(1200px 600px at 100% -10%, rgba(79, 140, 255, .08), transparent 60%),
+    radial-gradient(900px 500px at -10% 0%, rgba(124, 92, 255, .06), transparent 55%),
     var(--bg);
 }
 
@@ -16,7 +11,6 @@ body.no-scroll {
   overflow: hidden;
 }
 
-/* ------------------------------------------------------------- sidebar */
 .sidebar {
   position: fixed;
   inset: 0 auto 0 0;
@@ -170,7 +164,6 @@ body.no-scroll {
   color: var(--text-3);
 }
 
-/* ------------------------------------------------------------- main */
 .main {
   flex: 1 1 auto;
   min-width: 0;
@@ -261,7 +254,6 @@ body.no-scroll {
   background: var(--hover);
 }
 
-/* phones: search drops to its own row so the title always fits */
 @media (max-width: 899px) {
   .topbar {
     flex-wrap: wrap;
@@ -275,7 +267,6 @@ body.no-scroll {
   }
 }
 
-/* ------------------------------------------------------------- selection */
 .selection-bar {
   display: flex;
   align-items: center;
@@ -304,7 +295,6 @@ body.no-scroll {
   background: rgba(255, 255, 255, .1);
 }
 
-/* ------------------------------------------------------------- chips row */
 .chips {
   display: flex;
   gap: 8px;
@@ -318,7 +308,6 @@ body.no-scroll {
   display: none;
 }
 
-/* ------------------------------------------------------------- toolbar */
 .toolbar {
   display: flex;
   align-items: center;
@@ -340,14 +329,12 @@ body.no-scroll {
   font-weight: 550;
 }
 
-/* ------------------------------------------------------------- content */
 .content {
   flex: 1 1 auto;
   padding: 0 14px calc(var(--tabbar-h) + var(--safe-b) + 26px);
   min-height: 60vh;
 }
 
-/* ------------------------------------------------------------- grid */
 .files-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -359,7 +346,6 @@ body.no-scroll {
   gap: 8px;
 }
 
-/* ------------------------------------------------------------- file card */
 .file-card {
   position: relative;
   background: var(--surface);
@@ -400,7 +386,7 @@ body.no-scroll {
 .file-thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   opacity: 0;
   transform: scale(1.02);
   transition: opacity .35s var(--ease), transform .5s var(--ease);
@@ -534,7 +520,6 @@ body.no-scroll {
   border-top: 1px dashed var(--border);
 }
 
-/* ------------------------------------------------------------- list view */
 .files-list {
   display: flex;
   flex-direction: column;
@@ -579,7 +564,7 @@ body.no-scroll {
 .file-row .file-icon-sm img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .row-name {
@@ -594,7 +579,6 @@ body.no-scroll {
   white-space: nowrap;
 }
 
-/* ------------------------------------------------------------- empty / more */
 .empty {
   text-align: center;
   padding: 64px 20px;
@@ -642,7 +626,6 @@ body.no-scroll {
   color: var(--text-3);
 }
 
-/* ------------------------------------------------------------- tabbar */
 .tabbar {
   position: fixed;
   left: 0;
@@ -683,7 +666,6 @@ body.no-scroll {
   transform: translateY(-1px) scale(1.05);
 }
 
-/* ------------------------------------------------------------- FAB */
 .fab {
   position: fixed;
   right: 16px;
@@ -704,7 +686,6 @@ body.no-scroll {
   transform: scale(.92);
 }
 
-/* ------------------------------------------------------------- overlays */
 .overlay {
   position: fixed;
   inset: 0;
@@ -793,7 +774,6 @@ body.no-scroll {
   flex: 1 1 0;
 }
 
-/* ------------------------------------------------------------- confirm */
 .confirm-body {
   text-align: center;
   padding: 6px 4px 4px;
@@ -837,7 +817,6 @@ body.no-scroll {
   flex: 1 1 0;
 }
 
-/* ------------------------------------------------------------- toasts */
 .toast-host {
   position: fixed;
   left: 0;
@@ -886,7 +865,6 @@ body.no-scroll {
   color: var(--text);
 }
 
-/* ------------------------------------------------------------- ctx menu */
 .ctx-backdrop {
   position: fixed;
   inset: 0;
@@ -949,7 +927,6 @@ body.no-scroll {
   margin: 5px 6px;
 }
 
-/* ------------------------------------------------------------- details */
 .detail-hero {
   display: grid;
   place-items: center;
@@ -970,7 +947,7 @@ body.no-scroll {
 .detail-hero .hero-art img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .meta-list {
@@ -1018,7 +995,6 @@ body.no-scroll {
   color: var(--text-3);
 }
 
-/* ------------------------------------------------------------- settings */
 .setting-row {
   display: flex;
   align-items: center;
@@ -1157,12 +1133,11 @@ kbd {
   text-align: center;
 }
 
-/* ------------------------------------------------------------- viewer */
 .viewer {
   position: fixed;
   inset: 0;
   z-index: 80;
-  background: rgba(3, 5, 12, .96);
+  background: var(--viewer-bg);
   display: flex;
   flex-direction: column;
   animation: fade-in .18s var(--ease);
@@ -1173,7 +1148,7 @@ kbd {
   align-items: center;
   gap: 8px;
   padding: calc(var(--safe-t) + 10px) 12px 10px;
-  color: #fff;
+  color: var(--viewer-text);
 }
 
 .viewer-head .icon-btn {
@@ -1191,7 +1166,7 @@ kbd {
   text-align: center;
   font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, .92);
+  color: var(--viewer-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1225,8 +1200,12 @@ kbd {
   display: grid;
   place-items: center;
   color: #fff;
-  background: rgba(255, 255, 255, .12);
+  background: var(--viewer-btn);
   backdrop-filter: blur(8px);
+}
+
+.viewer-nav:hover {
+  background: var(--viewer-btn-hover);
 }
 
 .viewer-nav.prev {
@@ -1243,17 +1222,16 @@ kbd {
   justify-content: center;
   gap: 10px;
   padding: 12px calc(var(--safe-b) + 12px) calc(var(--safe-b) + 16px);
-  color: rgba(255, 255, 255, .9);
+  color: var(--viewer-text);
 }
 
 .viewer-counter {
   font-size: 12.5px;
-  color: rgba(255, 255, 255, .6);
+  color: var(--viewer-muted);
   min-width: 70px;
   text-align: center;
 }
 
-/* ------------------------------------------------------------- video */
 .vplayer {
   position: fixed;
   inset: 0;
@@ -1428,7 +1406,6 @@ kbd {
   transition: opacity .2s;
 }
 
-/* ------------------------------------------------------------- audio player */
 .aplayer {
   display: grid;
   gap: 14px;
@@ -1588,7 +1565,6 @@ kbd {
   color: var(--text-3);
 }
 
-/* ------------------------------------------------------------- doc preview */
 .doc-preview {
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -1611,7 +1587,45 @@ kbd {
   background: #fff;
 }
 
-/* ------------------------------------------------------------- desktop */
+.skeleton-thumb {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+}
+
+.skeleton-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-sm);
+  flex: 0 0 auto;
+}
+
+.inline-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 0;
+  color: var(--text-3);
+  font-size: 14px;
+}
+
+.heic-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, .6);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
 @media (min-width: 900px) {
   .sidebar {
     position: sticky;
@@ -1686,7 +1700,6 @@ kbd {
   }
 }
 
-/* desktop-only tweaks */
 body.is-desktop .content {
   min-height: 70vh;
 }
@@ -1712,7 +1725,6 @@ body.is-desktop .file-row:hover .row-actions {
   }
 }
 
-/* ------------------------------------------------------------- misc */
 .banner {
   display: flex;
   align-items: center;

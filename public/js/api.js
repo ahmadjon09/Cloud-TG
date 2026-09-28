@@ -1,10 +1,3 @@
-// api.js — backend client
-
-/**
- * Telegram injects fresh initData whenever it opens a Mini App. Do not persist it:
- * it is a signed, short-lived credential, and an old localStorage value is the
- * main cause of a misleading "Session expired" screen after reopening Cloud.
- */
 function initData() {
   return String(window.Telegram?.WebApp?.initData || "");
 }
@@ -16,9 +9,7 @@ function reportUnauthorized(error) {
   authFailureReported = true;
   try {
     window.dispatchEvent?.(new CustomEvent("cloud:unauthorized", { detail: error }));
-  } catch {
-    /* The API is also imported by non-browser tests. */
-  }
+  } catch {}
 }
 
 async function request(path, { method = "GET", body, headers = {}, raw = false, timeout = 25000 } = {}) {
@@ -74,13 +65,11 @@ export class ApiError extends Error {
 }
 
 export const api = {
-  /* ---- session ---- */
   me: () => request("/api/me"),
   updateMe: patch => request("/api/me", { method: "PATCH", body: patch }),
   detectLanguage: () => request("/api/me/detect-language", { method: "POST" }),
   stats: () => request("/api/stats"),
 
-  /* ---- files ---- */
   files: params => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params || {})) {
@@ -98,7 +87,6 @@ export const api = {
   sendFile: id => request(`/api/files/${id}/send`, { method: "POST", timeout: 40000 }),
   bulk: (ids, action) => request("/api/files/bulk", { method: "POST", body: { ids, action }, timeout: 60000 }),
 
-  /* ---- admin ---- */
   admin: {
     overview: () => request("/api/admin/overview"),
     users: params => {
@@ -124,10 +112,9 @@ export const api = {
   }
 };
 
-/** Media links are cached for a few minutes — a file id never changes. */
 const tokenCache = new Map();
-
 const pendingTokens = new Map();
+
 export async function mediaLink(file, kind = "preview") {
   const key = file.id;
   const hit = tokenCache.get(key);
@@ -146,7 +133,6 @@ export async function mediaLink(file, kind = "preview") {
   }
 }
 
-/** Telegram WebViews support native downloads; ordinary browsers use an anchor. */
 export async function downloadMedia(file) {
   const url = await mediaLink(file, "download");
   if (!url) throw new ApiError("Could not get a download link");

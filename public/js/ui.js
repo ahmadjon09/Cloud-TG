@@ -1,9 +1,7 @@
-// ui.js — reusable UI kit: toasts, sheets, dialogs, context menu, skeletons
 import { $, $$, el, haptic, escapeHtml } from "./core.js";
 import { icon } from "./icons.js";
 import { t } from "./i18n.js";
 
-/* ------------------------------------------------------------------ toasts */
 let toastHost = null;
 let toastTimer = null;
 
@@ -34,7 +32,6 @@ export function toast(message, type = "info", duration = 2400) {
   }, duration);
 }
 
-/* ---------------------------------------------------------------- overlays */
 let overlayCount = 0;
 const escStack = [];
 
@@ -51,10 +48,6 @@ document.addEventListener("keydown", e => {
   top.close();
 });
 
-/**
- * Bottom sheet on mobile / centered dialog on desktop.
- * @returns {{close:Function, node:HTMLElement, body:HTMLElement}}
- */
 export function sheet({ title = "", body, footer, size = "md", closable = true, onClose } = {}) {
   const backdrop = el("div", { class: "backdrop" });
   const bodyEl = el("div", { class: "sheet-body" });
@@ -100,7 +93,6 @@ export function sheet({ title = "", body, footer, size = "md", closable = true, 
   backdrop.addEventListener("click", () => closable && entry.close());
   panel.querySelector(".sheet-head .icon-btn")?.addEventListener("click", entry.close);
 
-  // drag-to-dismiss on touch devices
   let startY = null;
   const head = panel.querySelector(".sheet-head");
   head?.addEventListener("touchstart", e => (startY = e.touches[0].clientY), { passive: true });
@@ -124,7 +116,6 @@ export function sheet({ title = "", body, footer, size = "md", closable = true, 
   return { close: entry.close, node: panel, body: bodyEl, footer: footerEl };
 }
 
-/** Promise-based confirm dialog */
 export function confirm({ title, text, confirmText, cancelText, danger = false, icon: iconName = "warning" }) {
   return new Promise(resolve => {
     const cancelBtn = el("button", {
@@ -163,7 +154,6 @@ export function confirm({ title, text, confirmText, cancelText, danger = false, 
   });
 }
 
-/** Prompt for a single value */
 export function prompt({ title, label, value = "", placeholder = "", confirmText, multiline = false }) {
   return new Promise(resolve => {
     const input = multiline
@@ -200,7 +190,6 @@ export function prompt({ title, label, value = "", placeholder = "", confirmText
   });
 }
 
-/* ------------------------------------------------------------ context menu */
 let menuNode = null;
 export function contextMenu(items, x, y, { onClose } = {}) {
   closeContextMenu();
@@ -257,7 +246,6 @@ export function closeContextMenu() {
 window.addEventListener("scroll", closeContextMenu, { passive: true });
 window.addEventListener("resize", closeContextMenu);
 
-/* --------------------------------------------------------------- fragments */
 export function emptyState({ iconName = "cloud", title, text, action }) {
   const node = el(
     "div",
@@ -306,7 +294,13 @@ export function skeletonRows(count = 8) {
   return wrap;
 }
 
-/** Accessible switch row */
+export function inlineLoader(text) {
+  return el("div", { class: "inline-loader" },
+    el("span", { class: "spinner" }),
+    el("span", { text: text || t("state.loading") })
+  );
+}
+
 export function switchRow({ label, hint, value, onChange }) {
   const btn = el("button", {
     class: "switch",
@@ -334,7 +328,6 @@ export function switchRow({ label, hint, value, onChange }) {
   return { row, btn, setValue: v => btn.setAttribute("aria-checked", String(!!v)) };
 }
 
-/** Segmented control (view switch, theme switch…) */
 export function segmented(options, value, onChange) {
   const wrap = el("div", { class: "segmented", role: "tablist" });
   const buttons = options.map(opt => {
@@ -368,20 +361,37 @@ export function segmented(options, value, onChange) {
 
 export function avatarOf(user, size = 36) {
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.username || "";
-  if (user?.photoUrl) {
-    return el("span", { class: "avatar", style: { width: `${size}px`, height: `${size}px` } }, el("img", { src: user.photoUrl, alt: name, loading: "lazy" }));
-  }
-  const initials = name
+  const initialLetters = name
     ? name
         .split(/\s+/)
+        .filter(Boolean)
         .slice(0, 2)
         .map(p => p[0])
         .join("")
         .toUpperCase()
-    : null;
-  return el(
+    : "";
+
+  const avatarNode = el(
     "span",
-    { class: "avatar", style: { width: `${size}px`, height: `${size}px`, fontSize: `${size / 2.6}px` } },
-    initials ? el("span", { text: initials }) : icon("cloud", { size: Math.round(size / 2.2) })
+    { class: "avatar", style: { width: `${size}px`, height: `${size}px`, fontSize: `${size / 2.6}px` } }
   );
+
+  if (user?.photoUrl) {
+    const img = el("img", { src: user.photoUrl, alt: name, loading: "lazy" });
+    img.addEventListener("error", () => {
+      img.remove();
+      if (initialLetters) {
+        avatarNode.append(el("span", { text: initialLetters }));
+      } else {
+        avatarNode.append(icon("user", { size: Math.round(size / 2.2) }));
+      }
+    });
+    avatarNode.append(img);
+  } else if (initialLetters) {
+    avatarNode.append(el("span", { text: initialLetters }));
+  } else {
+    avatarNode.append(icon("cloud", { size: Math.round(size / 2.2) }));
+  }
+
+  return avatarNode;
 }

@@ -1,24 +1,36 @@
-// media.js — full-screen previews: images, video, audio, PDF, text
-import { el, formatSize, formatDuration, categoryOf, isImage, isVideo, isAudio, extOf, haptic, clamp } from "./core.js";
+import { el, formatSize, formatDuration, categoryOf, isImage, isVideo, isAudio, isHeic, extOf, haptic, clamp } from "./core.js";
 import { icon } from "./icons.js";
 import { t } from "./i18n.js";
 import { api, mediaLink, downloadMedia } from "./api.js";
-import { toast, sheet } from "./ui.js";
+import { toast, sheet, inlineLoader } from "./ui.js";
 
-/** play() does not always return a promise (jsdom, old WebViews) */
 function safePlay(node) {
   try {
     const result = node?.play?.();
     if (result && typeof result.catch === "function") result.catch(() => {});
-  } catch {
-    /* autoplay blocked — the UI shows the play button anyway */
-  }
+  } catch {}
 }
 
 const TEXT_EXT = ["txt", "md", "log", "json", "xml", "yml", "yaml", "csv", "js", "mjs", "ts", "jsx", "tsx", "html", "css", "scss", "py", "sh", "sql", "ini", "env"];
 const MAX_TEXT = 220_000;
 
-/* ============================================================ entry */
+function canBrowserShowHeic() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1;
+  canvas.height = 1;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+  try {
+    const img = new Image();
+    img.src = "data:image/heic;base64,AAA";
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+const HEIC_SUPPORTED = false;
+
 export async function openPreview(file, opts = {}) {
   const pool = (opts.files || []).filter(f => categoryOf(f.fileName, f.kind) === categoryOf(file.fileName, file.kind));
   if (isImage(file)) return imageViewer(file, pool);
@@ -58,7 +70,6 @@ function unsupported(file, reason) {
 }
 
 async function download(file) {
-  if (file.fileSize > 20 * 1024 * 1024) return toast(t("preview.tooBigText"), "error");
   try {
     await downloadMedia(file);
   } catch (e) {
@@ -77,7 +88,6 @@ async function send(file) {
   }
 }
 
-/* ============================================================ image viewer */
 function imageViewer(file, pool) {
   const list = pool.length ? pool : [file];
   let index = Math.max(0, list.findIndex(f => f.id === file.id));
@@ -87,7 +97,11 @@ function imageViewer(file, pool) {
   let dragging = null;
 
   const img = el("img", { alt: "", draggable: "false" });
-  const stage = el("div", { class: "viewer-stage" }, img);
+  const stage = el("div", { class: "viewer-stage" });
+  const loader = el("div", { class: "inline-loader", style: { position: "absolute", inset: "0", zIndex: "2" } },
+    el("span", { class: "spinner spinner-lg" })
+  );
+  stage.append(img, loader);
   const counter = el("div", { class: "viewer-counter" });
   const title = el("div", { class: "viewer-title" });
 
@@ -136,13 +150,49 @@ function imageViewer(file, pool) {
     title.textContent = current.fileName || "";
     counter.textContent = list.length > 1 ? t("preview.counter", { current: index + 1, total: list.length }) : "";
     resetZoom();
-    img.classList.remove("is-ready");
-    const url = await mediaLink(current, "preview");
-    if (!url) {
-      img.remove();
-      stage.append(el("div", { class: "muted", text: t("preview.unsupported") }));
+    img.style.opacity = "0";
+    loader.style.display = "";
+
+    const ext = extOf(current.fileName);
+    if (isHeic(current.fileName) && !HEIC_SUPPORTED) {
+      img.style.display = "none";
+      loader.innerHTML = "";
+      loader.style.display = "";
+      loader.style.background = "var(--surface-2)";
+      loader.style.flexDirection = "column";
+      loader.style.gap = "12px";
+      loader.style.borderRadius = "16px";
+      loader.style.padding = "32px";
+      loader.style.position = "relative";
+      loader.style.inset = "";
+      loader.append(
+        el("div", { html: icon("image", { size: 48 }), style: { color: "var(--text-3)", textAlign: "center" } }),
+        el("div", { style: { fontWeight: "700", fontSize: "15px", color: "var(--text)" }, text: `${ext.toUpperCase()} format` }),
+        el("div", { style: { fontSize: "13px", color: "var(--text-3)", textAlign: "center", maxWidth: "260px" }, text: "This image format is not supported by your browser. You can download it or send to Telegram." }),
+        el("div", { style: { display: "flex", gap: "8px", marginTop: "8px" } },
+          (() => { const b = el("button", { class: "btn btn-ghost btn-sm" }, icon("download", { size: 14 }), el("span", { text: t("action.download") })); b.addEventListener("click", () => download(current)); return b; })(),
+          (() => { const b = el("button", { class: "btn btn-primary btn-sm" }, icon("send", { size: 14 }), el("span", { text: t("action.sendToTelegram") })); b.addEventListener("click", () => send(current)); return b; })()
+        )
+      );
       return;
     }
+
+    img.style.display = "";
+    const url = await mediaLink(current, "preview");
+    if (!url) {
+      loader.style.display = "none";
+      img.remove();
+      stage.append(el("div", { class: "muted", style: { textAlign: "center" }, text: t("preview.unsupported") }));
+      return;
+    }
+    img.onload = () => {
+      loader.style.display = "none";
+      img.style.opacity = "1";
+    };
+    img.onerror = () => {
+      loader.style.display = "none";
+      img.style.opacity = "1";
+    };
     img.src = url;
   }
 
@@ -152,10 +202,7 @@ function imageViewer(file, pool) {
   });
   zoomOut.addEventListener("click", () => {
     scale = clamp(scale / 1.35, 1, 6);
-    if (scale === 1) {
-      tx = 0;
-      ty = 0;
-    }
+    if (scale === 1) { tx = 0; ty = 0; }
     applyTransform();
   });
   reset.addEventListener("click", resetZoom);
@@ -164,7 +211,6 @@ function imageViewer(file, pool) {
   dlBtn.addEventListener("click", () => download(list[index]));
   sendBtn.addEventListener("click", () => send(list[index]));
 
-  // pan
   stage.addEventListener("pointerdown", e => {
     if (scale === 1) return;
     dragging = { x: e.clientX - tx, y: e.clientY - ty };
@@ -181,30 +227,22 @@ function imageViewer(file, pool) {
   stage.addEventListener("wheel", e => {
     e.preventDefault();
     scale = clamp(scale * (e.deltaY < 0 ? 1.12 : 0.89), 1, 6);
-    if (scale === 1) {
-      tx = 0;
-      ty = 0;
-    }
+    if (scale === 1) { tx = 0; ty = 0; }
     applyTransform();
   }, { passive: false });
 
-  // double tap / double click to zoom
   let lastTap = 0;
   stage.addEventListener("pointerup", e => {
     if (e.pointerType !== "touch") return;
     const now = Date.now();
     if (now - lastTap < 280) {
       scale = scale > 1 ? 1 : 2.4;
-      if (scale === 1) {
-        tx = 0;
-        ty = 0;
-      }
+      if (scale === 1) { tx = 0; ty = 0; }
       applyTransform();
     }
     lastTap = now;
   });
 
-  // swipe between images
   let swipeStart = null;
   stage.addEventListener("touchstart", e => {
     swipeStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -240,7 +278,6 @@ function imageViewer(file, pool) {
   return viewer;
 }
 
-/* ============================================================ video player */
 async function videoPlayer(file) {
   const url = await mediaLink(file, "preview");
   if (!url) return unsupported(file, { title: t("preview.tooBig"), text: t("preview.tooBigText") });
@@ -281,14 +318,13 @@ async function videoPlayer(file) {
   let speedIdx = 0;
   let hideTimer = null;
 
-  const fmt = s => formatDuration(s);
   const togglePlay = () => (video.paused ? safePlay(video) : video.pause());
 
   video.addEventListener("loadedmetadata", () => {
-    dur.textContent = fmt(video.duration);
+    dur.textContent = formatDuration(video.duration);
   });
   video.addEventListener("timeupdate", () => {
-    cur.textContent = fmt(video.currentTime);
+    cur.textContent = formatDuration(video.currentTime);
     if (video.duration) seek.value = String(Math.round((video.currentTime / video.duration) * 1000));
   });
   video.addEventListener("play", () => {
@@ -330,7 +366,7 @@ async function videoPlayer(file) {
         await document.exitFullscreen?.();
         fsBtn.innerHTML = icon("expand", { size: 18 });
       }
-    } catch { /* ignore */ }
+    } catch {}
   });
   seek.addEventListener("input", () => {
     if (video.duration) video.currentTime = (Number(seek.value) / 1000) * video.duration;
@@ -349,10 +385,7 @@ async function videoPlayer(file) {
 
   const onKey = e => {
     if (e.key === "Escape" && !document.fullscreenElement) close();
-    if (e.key === " ") {
-      e.preventDefault();
-      togglePlay();
-    }
+    if (e.key === " ") { e.preventDefault(); togglePlay(); }
     if (e.key === "ArrowRight") video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
     if (e.key === "ArrowLeft") video.currentTime = Math.max(0, video.currentTime - 10);
   };
@@ -371,7 +404,6 @@ async function videoPlayer(file) {
   return player;
 }
 
-/* ============================================================ audio player */
 function audioPlayer(file, playlist) {
   const list = playlist.length ? playlist : [file];
   let index = Math.max(0, list.findIndex(f => f.id === file.id));
@@ -389,10 +421,6 @@ function audioPlayer(file, playlist) {
   const seek = el("input", { class: "ap-seek", type: "range", min: "0", max: "1000", value: "0" });
   const mainIcon = el("span", { html: icon("play", { size: 26 }) });
   const mainBtn = el("button", { class: "ap-btn is-main", "aria-label": t("action.play"), html: mainIcon });
-  const prevBtn = el("button", { class: "ap-btn", html: icon("repeat", { size: 0 }), style: { display: "none" } });
-  const backBtn = el("button", { class: "ap-btn", "aria-label": t("action.previous"), html: icon("play", { size: 0 }), style: { display: "none" } });
-  void prevBtn;
-  void backBtn;
 
   const back = el("button", { class: "ap-btn", "aria-label": t("action.previous"), html: icon("stepBack", { size: 19 }) });
   const fwd = el("button", { class: "ap-btn", "aria-label": t("action.next"), html: icon("stepForward", { size: 19 }) });
@@ -506,12 +534,8 @@ function audioPlayer(file, playlist) {
   return dialog;
 }
 
-/* ============================================================ documents */
 async function documentPreview(file) {
   const ext = extOf(file.fileName);
-  if (file.fileSize > 20 * 1024 * 1024) {
-    return unsupported(file, { title: t("preview.tooBig"), text: t("preview.tooBigText") });
-  }
 
   if (ext === "pdf") {
     const url = await mediaLink(file, "preview");
@@ -531,13 +555,16 @@ async function documentPreview(file) {
 
   if (TEXT_EXT.includes(ext)) {
     const url = await mediaLink(file, "preview");
-    const body = el("div", { class: "doc-preview", text: t("state.loading") });
+    const body = el("div", { class: "doc-preview" });
+    body.append(inlineLoader());
     try {
       const res = await fetch(url);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const text = await res.text();
+      body.innerHTML = "";
       body.textContent = text.length > MAX_TEXT ? `${text.slice(0, MAX_TEXT)}\n…` : text;
     } catch {
+      body.innerHTML = "";
       body.textContent = t("preview.unsupportedText");
     }
     const dialog = sheet({ title: file.fileName || t("action.preview"), body, size: "lg" });

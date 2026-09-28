@@ -1,4 +1,3 @@
-// core.js — shared helpers: DOM, formatting, storage, events
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
@@ -16,7 +15,6 @@ export function el(tag, attrs = {}, ...children) {
   }
   for (const c of children.flat()) {
     if (c === null || c === undefined || c === false) continue;
-    // A markup string (e.g. icon() output) becomes real DOM, not escaped text.
     if (typeof c === "string" && c.startsWith("<") && c.trimEnd().endsWith(">")) {
       const tpl = document.createElement("template");
       tpl.innerHTML = c;
@@ -61,7 +59,6 @@ export function raf(fn) {
   return requestAnimationFrame(() => requestAnimationFrame(fn));
 }
 
-/* ---------------- formatting ---------------- */
 const UNITS = ["B", "KB", "MB", "GB", "TB"];
 export function formatSize(bytes, digits) {
   const b = Number(bytes) || 0;
@@ -91,11 +88,8 @@ export function formatDateTime(value, locale = "en-US") {
   if (!value || Number.isNaN(d.getTime())) return "—";
   try {
     return d.toLocaleString(locale, {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
+      day: "numeric", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit"
     });
   } catch {
     return "";
@@ -131,22 +125,26 @@ export function initials(name = "") {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-/** Stable hue from a string — used for generated thumbnails */
 export function hashHue(str = "") {
   let h = 0;
   for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 360;
   return h;
 }
 
-/* ---------------- file classification (mirrors src/utils/fileType.js) ---------------- */
 const EXT = {
-  images: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "tif", "tiff", "heic", "heif", "ico", "avif"],
-  videos: ["mp4", "mov", "avi", "mkv", "webm", "flv", "wmv", "m4v", "3gp", "mpeg", "mpg", "ts"],
-  audio: ["mp3", "wav", "ogg", "oga", "m4a", "flac", "aac", "wma", "opus", "aiff", "alac", "amr"],
-  archives: ["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "dmg", "apk"]
+  images: ["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "tif", "tiff", "heic", "heif", "ico", "avif", "jfif", "pjpeg", "pjp"],
+  videos: ["mp4", "mov", "avi", "mkv", "webm", "flv", "wmv", "m4v", "3gp", "mpeg", "mpg", "ts", "ogv", "vob"],
+  audio: ["mp3", "wav", "ogg", "oga", "m4a", "flac", "aac", "wma", "opus", "aiff", "alac", "amr", "mid", "midi"],
+  archives: ["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "iso", "dmg", "apk", "lz", "lzma", "zst"]
 };
 
 export const CATEGORIES = ["images", "videos", "audio", "documents", "archives"];
+
+const HEIC_EXTS = new Set(["heic", "heif"]);
+
+export function isHeic(name = "") {
+  return HEIC_EXTS.has(extOf(name));
+}
 
 export function extOf(name = "") {
   const parts = String(name).split(".");
@@ -190,7 +188,6 @@ export function colorFor(file) {
   return `var(--c-${categoryOf(file?.fileName, file?.kind)})`;
 }
 
-/** Background tint for the same category (browser-safe, no color-mix needed) */
 export function colorSoftFor(file) {
   return `var(--c-${categoryOf(file?.fileName, file?.kind)}-soft)`;
 }
@@ -200,7 +197,6 @@ export const isVideo = f => categoryOf(f?.fileName, f?.kind) === "videos";
 export const isAudio = f => categoryOf(f?.fileName, f?.kind) === "audio";
 export const isPreviewable = f => ["images", "videos", "audio"].includes(categoryOf(f?.fileName, f?.kind));
 
-/* ---------------- local storage ---------------- */
 const LS_PREFIX = "cloud:";
 export const store = {
   get(key, fallback = null) {
@@ -222,13 +218,10 @@ export const store = {
   del(key) {
     try {
       localStorage.removeItem(LS_PREFIX + key);
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   }
 };
 
-/* ---------------- events ---------------- */
 const bus = new EventTarget();
 export function on(name, handler) {
   bus.addEventListener(name, e => handler(e.detail));
@@ -237,7 +230,6 @@ export function emit(name, detail) {
   bus.dispatchEvent(new CustomEvent(name, { detail }));
 }
 
-/* ---------------- misc ---------------- */
 export function clamp(n, min, max) {
   return Math.min(max, Math.max(min, n));
 }
@@ -252,16 +244,11 @@ export function copyText(text) {
   ta.value = text;
   document.body.append(ta);
   ta.select();
-  try {
-    document.execCommand("copy");
-  } catch {
-    /* ignore */
-  }
+  try { document.execCommand("copy"); } catch {}
   ta.remove();
   return Promise.resolve();
 }
 
-/** Lazy image loader: sets `src` only when the element is close to the viewport */
 let lazyObserver = null;
 export function observeLazy(root = document) {
   if (!lazyObserver) {
@@ -289,14 +276,11 @@ export function resetLazy() {
   lazyObserver = null;
 }
 
-/** Haptic feedback helper (Telegram only) */
 export function haptic(type = "light") {
   const tg = window.Telegram?.WebApp;
   if (!tg?.HapticFeedback) return;
   try {
     if (type === "success" || type === "error" || type === "warning") tg.HapticFeedback.notificationOccurred(type);
     else tg.HapticFeedback.impactOccurred(type);
-  } catch {
-    /* ignore */
-  }
+  } catch {}
 }
