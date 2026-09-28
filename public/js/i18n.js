@@ -1,7 +1,6 @@
-// i18n.js — loads /locales/<lang>.json and translates the UI
 import { $, $$, store } from "./core.js";
 
-const CACHE_KEY = "i18nCache";          // { [lang]: bundle }
+const CACHE_KEY = "i18nCache";
 const CACHE_VERSION_KEY = "i18nVersion";
 
 let currentLang = "en";
@@ -50,14 +49,10 @@ function interpolate(str, vars) {
   return str.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : `{${k}}`));
 }
 
-/** Translate a key, e.g. t("nav.images") */
 export function t(key, vars) {
   let value = get(bundle, key);
   if (value === undefined) value = get(fallback, key);
-  if (value === undefined) {
-    // last resort: the key itself (so a missing string is obvious in review)
-    return key;
-  }
+  if (value === undefined) return key;
   return interpolate(value, vars);
 }
 
@@ -82,16 +77,11 @@ async function fetchBundle(language) {
   return res.json();
 }
 
-/**
- * Loads a language bundle (memory → localStorage → network).
- * Falls back to English if the request fails.
- */
 export async function loadLanguage(language, { silent = false } = {}) {
   const target = language || "en";
   const cache = diskCache();
 
   if (!bundle || bundle.lang !== target) {
-    // try cache first for instant switching
     if (cache[target]) bundle = cache[target];
   }
   if (bundle?.lang !== target) {
@@ -126,7 +116,6 @@ export async function loadLanguage(language, { silent = false } = {}) {
   return target;
 }
 
-/** Rewrites every [data-i18n] / [data-i18n-placeholder] / [data-i18n-title] node */
 export function applyStatic(root = document) {
   $$("[data-i18n]", root).forEach(node => {
     node.textContent = t(node.dataset.i18n);
@@ -141,12 +130,10 @@ export function applyStatic(root = document) {
   });
 }
 
-/** Language list for the picker (from the boot payload) */
 export function languages() {
   return boot.languages || [{ code: "en", name: "English", flag: "🇬🇧" }];
 }
 
-/** Best guess before we know the account language */
 export function guessLanguage() {
   const saved = store.get("lang");
   if (saved && languages().some(l => l.code === saved)) return saved;

@@ -1,44 +1,30 @@
-/* =========================================================================
-   tokens.css — design system: colours, spacing, typography, primitives
-   ========================================================================= */
-
 :root {
-  /* brand */
   --brand-500: #4f8cff;
   --brand-600: #2f6ff5;
   --brand-400: #6ea8fe;
   --brand-soft: rgba(79, 140, 255, 0.14);
-
-  /* semantic */
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
   --info: #38bdf8;
-
-  /* category colours */
   --c-images: #38bdf8;
   --c-videos: #fb923c;
   --c-audio: #a78bfa;
   --c-documents: #60a5fa;
   --c-archives: #f472b6;
   --c-other: #94a3b8;
-
-  /* soft (background) variants */
   --c-images-soft: rgba(56, 189, 248, .16);
   --c-videos-soft: rgba(251, 146, 60, .16);
   --c-audio-soft: rgba(167, 139, 250, .16);
   --c-documents-soft: rgba(96, 165, 250, .16);
   --c-archives-soft: rgba(244, 114, 182, .16);
   --c-other-soft: rgba(148, 163, 184, .16);
-
-  /* geometry */
   --r-xs: 8px;
   --r-sm: 10px;
   --r-md: 14px;
   --r-lg: 18px;
   --r-xl: 24px;
   --r-full: 999px;
-
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -46,29 +32,23 @@
   --sp-5: 20px;
   --sp-6: 24px;
   --sp-8: 32px;
-
   --header-h: 60px;
   --tabbar-h: 62px;
   --sidebar-w: 268px;
-
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .18);
   --shadow-2: 0 6px 20px rgba(0, 0, 0, .22);
   --shadow-3: 0 18px 48px rgba(0, 0, 0, .38);
-
   --ease: cubic-bezier(.22, .61, .36, 1);
   --dur: .18s;
   --dur-slow: .32s;
-
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Noto Sans Arabic", "Noto Sans SC", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-
   --safe-t: env(safe-area-inset-top, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
   --safe-r: env(safe-area-inset-right, 0px);
 }
 
-/* ---------------- dark (default) ---------------- */
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -88,11 +68,17 @@
   --glass: rgba(21, 27, 46, .82);
   --hover: rgba(255, 255, 255, .06);
   --active: rgba(255, 255, 255, .1);
+  --viewer-bg: rgba(3, 5, 12, .96);
+  --viewer-text: rgba(255, 255, 255, .92);
+  --viewer-muted: rgba(255, 255, 255, .6);
+  --viewer-btn: rgba(255, 255, 255, .12);
+  --viewer-btn-hover: rgba(255, 255, 255, .2);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
   --bg: #f4f6fb;
+  --bg-2: #edf0f7;
   --surface: #ffffff;
   --surface-2: #f2f5fb;
   --surface-3: #e8edf7;
@@ -111,9 +97,32 @@
   --brand-600: #1d4ed8;
   --brand-400: #3b82f6;
   --brand-soft: rgba(37, 99, 235, .12);
+  --viewer-bg: rgba(0, 0, 0, .92);
+  --viewer-text: rgba(255, 255, 255, .92);
+  --viewer-muted: rgba(255, 255, 255, .6);
+  --viewer-btn: rgba(255, 255, 255, .15);
+  --viewer-btn-hover: rgba(255, 255, 255, .25);
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, .08);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, .1);
+  --shadow-3: 0 18px 48px rgba(0, 0, 0, .15);
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --info: #0ea5e9;
+  --c-images: #0ea5e9;
+  --c-videos: #f97316;
+  --c-audio: #8b5cf6;
+  --c-documents: #3b82f6;
+  --c-archives: #ec4899;
+  --c-other: #64748b;
+  --c-images-soft: rgba(14, 165, 233, .12);
+  --c-videos-soft: rgba(249, 115, 22, .12);
+  --c-audio-soft: rgba(139, 92, 246, .12);
+  --c-documents-soft: rgba(59, 130, 246, .12);
+  --c-archives-soft: rgba(236, 72, 153, .12);
+  --c-other-soft: rgba(100, 116, 139, .12);
 }
 
-/* ---------------- reset ---------------- */
 *,
 *::before,
 *::after {
@@ -141,18 +150,11 @@ body {
   overscroll-behavior-y: none;
 }
 
-h1,
-h2,
-h3,
-h4,
-p {
+h1, h2, h3, h4, p {
   margin: 0;
 }
 
-button,
-input,
-textarea,
-select {
+button, input, textarea, select {
   font: inherit;
   color: inherit;
 }
@@ -169,9 +171,7 @@ a {
   text-decoration: none;
 }
 
-img,
-video,
-canvas {
+img, video, canvas {
   display: block;
   max-width: 100%;
 }
@@ -209,7 +209,6 @@ ul {
   background-clip: content-box;
 }
 
-/* ---------------- utilities ---------------- */
 .row {
   display: flex;
   align-items: center;
@@ -270,7 +269,6 @@ ul {
   border: 0;
 }
 
-/* ---------------- primitives ---------------- */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -343,7 +341,6 @@ ul {
   width: 100%;
 }
 
-/* Icon glyphs (Font Awesome subset) — never stretch/shrink inside flex rows */
 .icon {
   display: inline-block;
   flex: 0 0 auto;
@@ -515,12 +512,15 @@ select.field {
   background: linear-gradient(135deg, var(--brand-400), #7c5cff);
   overflow: hidden;
   flex: 0 0 auto;
+  position: relative;
 }
 
 .avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  position: absolute;
+  inset: 0;
 }
 
 .spinner {
@@ -534,9 +534,7 @@ select.field {
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 .skeleton {
@@ -547,13 +545,8 @@ select.field {
 }
 
 @keyframes shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-
-  100% {
-    background-position: 0 0;
-  }
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
 }
 
 .tag {
@@ -584,35 +577,18 @@ select.field {
 }
 
 @keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: scale(.96) translateY(8px);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
+  from { opacity: 0; transform: scale(.96) translateY(8px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slide-up {
-  from {
-    transform: translateY(100%);
-  }
-
-  to {
-    transform: none;
-  }
+  from { transform: translateY(100%); }
+  to { transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

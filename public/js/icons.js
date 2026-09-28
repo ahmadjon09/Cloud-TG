@@ -1,7 +1,3 @@
-// icons.js — Font Awesome Free 7 (solid) glyph set, served locally.
-// No inline SVG anywhere: every icon is a font glyph from /public/fonts/fa-solid-900.woff2
-// (subset CSS in /public/css/icons.css), so it renders crisply at any size and
-// works inside Telegram's iframe, offline and under the strict CSP.
 const MAP = {
   cloud: "fa-cloud",
   home: "fa-house",
@@ -78,21 +74,14 @@ const MAP = {
   calendar: "fa-calendar",
   headset: "fa-headset",
   stepBack: "fa-backward-step",
-  stepForward: "fa-forward-step"
+  stepForward: "fa-forward-step",
+  user: "fa-users"
 };
 
-/**
- * Renders an icon as a Font Awesome glyph.
- * The signature is kept identical to the old SVG implementation
- * (size in px, extra class, inline style) so all call sites work unchanged.
- * @param {string} name
- * @param {{size?:number, className?:string, stroke?:number, style?:string}} opts
- */
 export function icon(name, opts = {}) {
   const { size = 20, className = "", style = "" } = opts;
   const glyph = MAP[name] || MAP.file;
   return `<i class="fa-solid ${glyph} icon ${className}" aria-hidden="true" style="font-size:${Number(size) || 20}px${style ? ";" + style : ""}"></i>`;
 }
 
-/** All icon names (used by the dev-only icon gallery) */
 export const iconNames = Object.keys(MAP);

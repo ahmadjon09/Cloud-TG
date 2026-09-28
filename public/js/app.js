@@ -1,7 +1,6 @@
-// app.js — Cloud web app: navigation, file browser, selection, settings
 import {
   $, $$, el, escapeHtml, debounce, throttle, formatSize, formatDate, formatRelative,
-  iconFor, colorFor, colorSoftFor, isImage, isVideo, isAudio, isPreviewable,
+  iconFor, colorFor, colorSoftFor, isImage, isVideo, isAudio, isPreviewable, isHeic,
   store, haptic, observeLazy, extOf, clamp
 } from "./core.js";
 import { t, loadLanguage, applyStatic, bootConfig, languages, guessLanguage, rememberLanguage, lang, htmlLang, onChange as onLangChange } from "./i18n.js";
@@ -9,14 +8,13 @@ import { icon } from "./icons.js";
 import { api, mediaLink, downloadMedia, clearMediaLinks } from "./api.js";
 import {
   toast, sheet, confirm, contextMenu, closeContextMenu, emptyState,
-  skeletonGrid, skeletonRows, switchRow, segmented, avatarOf
+  skeletonGrid, skeletonRows, switchRow, segmented, avatarOf, inlineLoader
 } from "./ui.js";
 import { openPreview } from "./media.js";
 
 const tg = window.Telegram?.WebApp;
 const boot = bootConfig();
 
-/* ============================================================ state */
 const state = {
   user: null,
   stats: { files: 0, size: 0 },
@@ -37,7 +35,7 @@ const state = {
   ready: false,
   authExpired: false,
   theme: store.get("theme", "auto"),
-  desktopMode: store.get("desktopMode", null), // null = auto
+  desktopMode: store.get("desktopMode", null),
   autoFullscreen: store.get("autoFullscreen", true),
   autoThumbnails: store.get("autoThumbnails", true),
   lastScroll: 0
@@ -59,7 +57,6 @@ const VIEWS = [
 const SORTS = ["newest", "oldest", "nameAsc", "nameDesc", "largest", "smallest"];
 const TABS = ["all", "images", "favorites", "settings"];
 
-/* ============================================================ dom refs */
 const dom = {
   app: $("#app"),
   sidebar: $("#sidebar"),
@@ -86,7 +83,6 @@ const dom = {
   brandMark: $("#brandMark")
 };
 
-/* ============================================================ theme */
 function resolveTheme(mode) {
   if (mode && mode !== "auto") return mode;
   const tgTheme = tg?.colorScheme;
@@ -113,7 +109,7 @@ function applyTheme(mode = state.theme) {
     try {
       tg.setHeaderColor?.(resolved === "light" ? "#f4f6fb" : "#0b1020");
       tg.setBackgroundColor?.(resolved === "light" ? "#f4f6fb" : "#0b1020");
-    } catch { /* older clients */ }
+    } catch {}
   }
   store.set("theme", mode);
 }
@@ -126,7 +122,6 @@ function toggleTheme() {
   syncUserSettings({ theme: next });
 }
 
-/* ============================================================ desktop mode */
 function isDesktopViewport() {
   return window.innerWidth >= 900;
 }
@@ -143,10 +138,7 @@ function applyDesktopMode() {
 
 async function requestFullscreen({ silent = false } = {}) {
   try {
-    if (tg?.requestFullscreen) {
-      tg.requestFullscreen();
-      return true;
-    }
+    if (tg?.requestFullscreen) { tg.requestFullscreen(); return true; }
     const target = document.documentElement;
     if (!document.fullscreenElement) {
       await target.requestFullscreen?.({ navigationUI: "hide" });
@@ -162,22 +154,17 @@ function exitFullscreen() {
   try {
     if (document.fullscreenElement) document.exitFullscreen?.();
     tg?.exitFullscreen?.();
-  } catch { /* ignore */ }
+  } catch {}
 }
 
 function isFullscreen() {
   return Boolean(document.fullscreenElement || tg?.isFullscreen);
 }
 
-/**
- * Browsers only allow fullscreen after a real user gesture, so we try
- * immediately and — if that was blocked — once more on the first interaction.
- */
 let autoFsArmed = false;
 function setupAutoFullscreen() {
   if (!state.autoFullscreen || !isDesktopMode() || autoFsArmed) return;
   autoFsArmed = true;
-
   const cleanup = () => {
     window.removeEventListener("pointerdown", handler);
     window.removeEventListener("keydown", handler);
@@ -187,7 +174,6 @@ function setupAutoFullscreen() {
     const ok = await requestFullscreen({ silent: true });
     if (ok) cleanup();
   };
-
   requestFullscreen({ silent: true }).then(ok => {
     if (ok) return cleanup();
     window.addEventListener("pointerdown", handler, { once: true });
@@ -196,7 +182,6 @@ function setupAutoFullscreen() {
   });
 }
 
-/* ============================================================ telegram */
 function initTelegram() {
   if (!tg) return;
   try {
@@ -204,8 +189,6 @@ function initTelegram() {
     tg.expand();
     tg.enableClosingConfirmation?.();
     tg.disableVerticalSwipes?.();
-    // initData is a short-lived Telegram credential. Older versions persisted it
-    // in localStorage, which made a reopened Mini App reuse an expired session.
     store.del("initData");
     tg.onEvent?.("themeChanged", () => applyTheme(state.theme));
     tg.onEvent?.("viewportChanged", () => applyDesktopMode());
@@ -220,7 +203,6 @@ function initTelegram() {
   }
 }
 
-/* ============================================================ navigation */
 const viewMeta = id => VIEWS.find(v => v.id === id) || VIEWS[0];
 
 function renderNav() {
@@ -324,7 +306,6 @@ function closeDrawer() {
   $("#drawerBackdrop")?.remove();
 }
 
-/* ============================================================ data */
 async function loadMe() {
   if (state.authExpired) return false;
   try {
@@ -353,7 +334,7 @@ async function loadCounts() {
     state.counts = res.counts || {};
     renderNav();
     renderChips();
-  } catch { /* non-critical */ }
+  } catch {}
 }
 
 function applyUser() {
@@ -379,8 +360,7 @@ function applyUser() {
       el("span", { class: "small", text: t("settings.storageUsed") }),
       el("span", { class: "small", style: { fontWeight: "700" }, text: formatSize(used) })
     ),
-    el("div", { class: "storage-meter" }, el("span", { style: { width: `${clamp(Math.log10(files + 1) * 22, 6, 100)}%` } })),
-    el("div", { class: "row-between" },
+    el("div", { class: "row-between", style: { marginTop: "8px" } },
       el("span", { class: "small muted", text: t("stats.files") + ": " + files }),
       state.isAdmin ? el("span", { class: "tag", text: "Admin" }) : null
     )
@@ -392,24 +372,15 @@ function isAuthenticationError(error) {
 }
 
 function reopenTelegramSession() {
-  // Telegram cannot refresh initData inside an existing WebView. Closing it and
-  // launching Cloud from the bot makes Telegram provide a fresh signed payload.
   try {
-    if (tg?.close) {
-      tg.close();
-      return;
-    }
-  } catch { /* continue with the browser fallback */ }
-
+    if (tg?.close) { tg.close(); return; }
+  } catch {}
   const username = String(boot.botUsername || "").replace(/^@/, "").trim();
   if (username) {
     const url = `https://t.me/${username}`;
     try {
-      if (tg?.openTelegramLink) {
-        tg.openTelegramLink(url);
-        return;
-      }
-    } catch { /* ordinary browser fallback below */ }
+      if (tg?.openTelegramLink) { tg.openTelegramLink(url); return; }
+    } catch {}
     window.location.assign(url);
     return;
   }
@@ -459,9 +430,7 @@ function showFatal(error) {
     emptyState({
       iconName: demo ? "cloud" : "warning",
       title: demo ? t("header.demo") : t("empty.errorTitle"),
-      text: demo
-        ? t("empty.text")
-        : `${error?.message || t("toast.failed")}`,
+      text: demo ? t("empty.text") : `${error?.message || t("toast.failed")}`,
       action: el(
         "button",
         { class: "btn btn-primary", style: { marginTop: "14px" } },
@@ -548,7 +517,6 @@ async function loadMore() {
   }
 }
 
-/* ============================================================ rendering */
 function renderContent() {
   if (state.view === "settings") return renderSettings();
   dom.content.innerHTML = "";
@@ -576,10 +544,6 @@ function renderContent() {
 
 function renderEmptyState() {
   const iconName = { images: "image", videos: "video", audio: "audio", documents: "file", archives: "archive", favorites: "star", trash: "trash" }[state.view] || "cloud";
-  const texts = {
-    favorite_empty: null
-  };
-  void texts;
   let title = t("empty.title");
   let text = t("empty.text");
   if (state.search) {
@@ -634,10 +598,6 @@ function renderLoadMore() {
   }
 }
 
-/**
- * Thumbnails load automatically as you scroll: the token (and therefore the
- * image) is only requested once the card is within 500px of the viewport.
- */
 const thumbObserver = new IntersectionObserver(
   entries => {
     for (const entry of entries) {
@@ -675,9 +635,7 @@ async function loadThumb(img, file) {
       img.remove();
       img.closest(".file-thumb")?.append(fallbackArt(file, colorFor(file)));
     }
-  } catch {
-    /* offline / expired token — the fallback art stays visible */
-  } finally {
+  } catch {} finally {
     thumbPending.delete(file.id);
   }
 }
@@ -690,7 +648,7 @@ function thumbNode(file) {
   if (file.isPrivate) badges.append(el("span", { class: "badge-pill", html: icon("lock", { size: 12 }) }));
   if (badges.children.length) wrap.append(badges);
 
-  const canThumb = (isImage(file) || isVideo(file)) && file.fileSize <= 20 * 1024 * 1024;
+  const canThumb = (isImage(file) || isVideo(file)) && file.fileSize <= 20 * 1024 * 1024 && !isHeic(file.fileName);
   if (canThumb && state.autoThumbnails) {
     const img = el("img", { alt: escapeHtml(file.fileName), loading: "lazy", decoding: "async" });
     img.addEventListener("load", () => img.classList.add("is-loaded"));
@@ -700,9 +658,12 @@ function thumbNode(file) {
     });
     img.dataset.thumbFor = file.id;
     wrap.append(img);
-    thumbObserver.observe(img); // loads only when the card gets close to the viewport
+    thumbObserver.observe(img);
   } else {
     wrap.append(fallbackArt(file, color));
+    if (isHeic(file.fileName)) {
+      wrap.append(el("span", { class: "heic-badge", text: "HEIC" }));
+    }
   }
   if (isVideo(file)) wrap.append(el("span", { class: "play-badge", html: icon("play", { size: 13 }) }));
   return wrap;
@@ -752,7 +713,7 @@ function fileRow(file) {
   const selected = state.selected.has(file.id);
   const row = el("div", { class: `file-row ${selected ? "is-selected" : ""}`, tabindex: "0", role: "button", dataset: { id: file.id } });
   const iconWrap = el("div", { class: "file-icon-sm", style: { background: colorSoftFor(file), color: colorFor(file) } });
-  if ((isImage(file) || isVideo(file)) && state.autoThumbnails && file.fileSize <= 20 * 1024 * 1024) {
+  if ((isImage(file) || isVideo(file)) && state.autoThumbnails && file.fileSize <= 20 * 1024 * 1024 && !isHeic(file.fileName)) {
     const img = el("img", { alt: "", loading: "lazy", decoding: "async", dataset: { thumbFor: file.id } });
     img.addEventListener("error", () => {
       img.remove();
@@ -817,10 +778,7 @@ function bindFileEvents(node, file) {
   let longPressed = false;
 
   node.addEventListener("click", e => {
-    if (longPressed) {
-      longPressed = false;
-      return;
-    }
+    if (longPressed) { longPressed = false; return; }
     if (state.selectionMode || e.shiftKey || e.metaKey || e.ctrlKey) {
       toggleSelect(file.id, node);
       return;
@@ -892,7 +850,6 @@ function openFile(file, forcePreview = false) {
   openDetails(file);
 }
 
-/* ============================================================ toolbar */
 function renderToolbar() {
   dom.toolbarActions.innerHTML = "";
   const inTrash = state.view === "trash";
@@ -943,7 +900,6 @@ function renderToolbarCounts() {
   if (state.selectionMode) renderSelectionBar();
 }
 
-/* ============================================================ selection */
 function enterSelection(id, node) {
   state.selectionMode = true;
   state.selected.add(id);
@@ -998,10 +954,8 @@ function renderSelectionBar() {
   dom.toolbar.classList.add("has-selection");
 }
 
-/* ============================================================ actions */
 async function sendFiles(ids) {
   if (!ids.length) return toast(t("toast.nothingSelected"), "warning");
-  const first = state.files.find(f => f.id === ids[0]);
   if (ids.length > 1) {
     const ok = await confirm({
       title: t("confirm.sendManyTitle", { count: ids.length }),
@@ -1022,7 +976,6 @@ async function sendFiles(ids) {
     toast(`${t("toast.sendFailed")}: ${e.message}`, "error", 3200);
     haptic("error");
   }
-  void first;
 }
 
 async function deleteFiles(ids, hard = false) {
@@ -1102,7 +1055,6 @@ async function renameFile(file) {
 }
 
 async function downloadFile(file) {
-  if (file.fileSize > 20 * 1024 * 1024) return toast(t("preview.tooBigText"), "error");
   try {
     await downloadMedia(file);
   } catch (e) {
@@ -1136,11 +1088,10 @@ async function emptyTrash() {
   }
 }
 
-/* ============================================================ details sheet */
 function openDetails(file) {
   const body = el("div", { class: "detail" });
   const art = el("div", { class: "hero-art", style: { color: colorFor(file) } });
-  if ((isImage(file) || isVideo(file)) && file.fileSize <= 20 * 1024 * 1024) {
+  if ((isImage(file) || isVideo(file)) && file.fileSize <= 20 * 1024 * 1024 && !isHeic(file.fileName)) {
     const img = el("img", { alt: "", dataset: { thumbFor: file.id } });
     img.addEventListener("error", () => {
       img.remove();
@@ -1229,13 +1180,11 @@ function metaRow(iconName, key, value) {
   );
 }
 
-/* ============================================================ settings view */
 function renderSettings() {
   dom.content.innerHTML = "";
   const wrap = el("div", { class: "settings" });
   const u = state.user || {};
 
-  /* --- language --- */
   wrap.append(el("div", { class: "setting-section", text: t("settings.language") }));
   const langGrid = el("div", { class: "lang-grid" });
   for (const l of languages()) {
@@ -1257,7 +1206,6 @@ function renderSettings() {
   }
   wrap.append(langGrid);
 
-  /* --- appearance --- */
   wrap.append(el("div", { class: "setting-section", text: t("settings.appearance") }));
   const themeSeg = segmented(
     [
@@ -1283,7 +1231,6 @@ function renderSettings() {
     )
   );
 
-  /* --- interface --- */
   const desktop = switchRow({
     label: t("settings.desktopMode"),
     hint: t("settings.desktopModeHint"),
@@ -1348,7 +1295,6 @@ function renderSettings() {
     )
   );
 
-  /* --- files --- */
   const priv = switchRow({
     label: t("settings.privateByDefault"),
     value: !!u.settings?.privateByDefault,
@@ -1383,7 +1329,6 @@ function renderSettings() {
     )
   );
 
-  /* --- storage --- */
   wrap.append(
     el("div", { class: "setting-section", text: t("settings.storageUsed") }),
     el("div", { class: "setting-card" },
@@ -1405,7 +1350,6 @@ function renderSettings() {
     )
   );
 
-  /* --- shortcuts --- */
   wrap.append(
     el("div", { class: "setting-section", text: t("shortcuts.title") }),
     el("div", { class: "setting-card" },
@@ -1420,7 +1364,6 @@ function renderSettings() {
     el("p", { class: "small muted", style: { padding: "10px 12px" }, text: t("shortcuts.hint") })
   );
 
-  /* --- about --- */
   wrap.append(
     el("div", { class: "setting-section", text: t("settings.aboutSection") }),
     el("div", { class: "setting-card" },
@@ -1434,9 +1377,7 @@ function renderSettings() {
     )
   );
   wrap.querySelector(".btn-danger").addEventListener("click", () => {
-    try {
-      tg?.close();
-    } catch { /* ignore */ }
+    try { tg?.close(); } catch {}
     window.location.href = "https://t.me";
   });
 
@@ -1476,7 +1417,6 @@ async function resetSettings() {
   window.location.reload();
 }
 
-/* ============================================================ more menu */
 function showMoreMenu(target) {
   const rect = target.getBoundingClientRect();
   contextMenu(
@@ -1538,14 +1478,12 @@ function openShortcuts() {
   sheet({ title: t("shortcuts.title"), body: list, size: "sm" });
 }
 
-/* ============================================================ search */
 const onSearch = debounce(value => {
   state.search = value.trim();
   dom.searchClear.classList.toggle("hidden", !value);
   refreshFiles();
 }, 320);
 
-/* ============================================================ events */
 function bindEvents() {
   onLangChange(() => {
     if (!state.ready) return;
@@ -1654,7 +1592,6 @@ function selectAll() {
   renderSelectionBar();
 }
 
-/* ============================================================ boot */
 function renderAll() {
   applyStatic();
   renderNav();
@@ -1683,8 +1620,6 @@ function paintStaticIcons() {
 }
 
 async function main() {
-  // Remove the short-lived credential left by older Cloud versions even when
-  // this page is opened outside Telegram.
   store.del("initData");
   paintStaticIcons();
   initTelegram();
@@ -1712,7 +1647,6 @@ async function main() {
   loadCounts();
   setupAutoFullscreen();
 
-  // Returning from the bot should show newly uploaded files, not an old list.
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden && state.ready) {
       refreshFiles();
@@ -1720,7 +1654,6 @@ async function main() {
     }
   });
 
-  // keep Telegram's cache warm & counts fresh
   setInterval(() => {
     if (!document.hidden && state.view !== "settings") loadCounts();
   }, 60_000);
@@ -1732,8 +1665,6 @@ function registerServiceWorker() {
   const hadController = Boolean(navigator.serviceWorker.controller);
   let reloaded = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
-    // A NEW service worker took over → this page may still hold stale modules;
-    // reload once so the fresh build renders (guard avoids reload loops).
     if (!hadController || reloaded) return;
     reloaded = true;
     location.reload();

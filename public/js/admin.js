@@ -1,4 +1,3 @@
-// admin.js — admin panel: dashboard, users, files, broadcast, system
 import {
   $, el, debounce, formatSize, formatDate, formatDateTime, formatRelative,
   categoryOf, iconFor, haptic
@@ -39,10 +38,9 @@ const dom = {
   adminMark: $("#adminMark")
 };
 
-const CAT_COLOR = { images: "#38bdf8", videos: "#fb923c", audio: "#a78bfa", documents: "#60a5fa", archives: "#f472b6" };
-const KIND_COLOR = { photo: "#38bdf8", video: "#fb923c", audio: "#a78bfa", voice: "#f472b6", document: "#60a5fa" };
+const CAT_COLOR = { images: "var(--c-images)", videos: "var(--c-videos)", audio: "var(--c-audio)", documents: "var(--c-documents)", archives: "var(--c-archives)" };
+const KIND_COLOR = { photo: "var(--c-images)", video: "var(--c-videos)", audio: "var(--c-audio)", voice: "var(--c-archives)", document: "var(--c-documents)" };
 
-/* ============================================================ helpers */
 function displayName(u) {
   return [u.firstName, u.lastName].filter(Boolean).join(" ") || (u.username ? `@${u.username}` : `#${u.id}`);
 }
@@ -53,11 +51,16 @@ function langName(code) {
 }
 
 function applyTheme() {
-  const resolved = tg?.colorScheme || (window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const saved = localStorage.getItem("cloud:theme");
+  let resolved;
+  if (saved && saved !== "auto") {
+    resolved = saved;
+  } else {
+    resolved = tg?.colorScheme || (window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  }
   document.documentElement.dataset.theme = resolved;
 }
 
-/* ============================================================ shell */
 function renderTabs() {
   dom.tabs.innerHTML = "";
   for (const tab of TABS) {
@@ -95,7 +98,6 @@ async function setTab(id) {
   }
 }
 
-/* ============================================================ dashboard */
 async function renderDashboard() {
   const data = await api.admin.overview();
   state.overview = data;
@@ -121,10 +123,8 @@ async function renderDashboard() {
   }
   dom.main.append(grid);
 
-  /* charts */
   const chartRow = el("div", { class: "chart-row" });
 
-  // donut: files by type
   const byKind = data.byKind || [];
   const totalKind = byKind.reduce((a, k) => a + k.count, 0) || 1;
   let acc = 0;
@@ -132,7 +132,7 @@ async function renderDashboard() {
     const from = (acc / totalKind) * 360;
     acc += k.count;
     const to = (acc / totalKind) * 360;
-    const color = KIND_COLOR[k.kind] || CAT_COLOR[categoryOf("", k.kind)] || "#64748b";
+    const color = KIND_COLOR[k.kind] || CAT_COLOR[categoryOf("", k.kind)] || "var(--text-3)";
     return `${color} ${from}deg ${to}deg`;
   });
   const donut = el("div", { class: "donut", style: { background: byKind.length ? `conic-gradient(${stops.join(", ")})` : "var(--surface-3)" } },
@@ -145,7 +145,7 @@ async function renderDashboard() {
   for (const k of byKind) {
     legend.append(
       el("div", { class: "legend-item" },
-        el("span", { class: "legend-dot", style: { background: KIND_COLOR[k.kind] || "#64748b" } }),
+        el("span", { class: "legend-dot", style: { background: KIND_COLOR[k.kind] || "var(--text-3)" } }),
         el("span", { text: (k.kind || "document").toUpperCase() }),
         el("span", { class: "legend-value", text: `${k.count} · ${formatSize(k.size)}` }))
     );
@@ -156,7 +156,6 @@ async function renderDashboard() {
       el("div", { class: "panel-body" }, el("div", { class: "donut-wrap" }, donut, legend)))
   );
 
-  // bars: uploads per day
   const uploads = data.uploads || [];
   const maxUp = Math.max(1, ...uploads.map(u => u.count));
   const bars = el("div", { class: "bars" });
@@ -178,7 +177,6 @@ async function renderDashboard() {
   );
   dom.main.append(chartRow);
 
-  /* top users */
   const rows = (data.topUsers || []).map(u => el("tr", {},
     el("td", {}, el("div", { class: "cell-user" },
       avatarOf({ firstName: u.name, photoUrl: "" }, 28),
@@ -207,7 +205,6 @@ async function renderDashboard() {
   );
 }
 
-/* ============================================================ users */
 async function renderUsers() {
   const s = state.users;
   s.loading = true;
@@ -357,7 +354,6 @@ async function deleteUserFiles(u) {
   }
 }
 
-/* ============================================================ files */
 async function renderFiles() {
   const s = state.files;
   const res = await api.admin.files({ q: s.q, kind: s.kind, limit: s.limit, skip: s.skip });
@@ -440,7 +436,6 @@ async function renderFiles() {
   dom.main.append(pager(s, renderFiles));
 }
 
-/* ============================================================ broadcast */
 async function renderBroadcast() {
   const historyRes = await api.admin.broadcasts().catch(() => ({ items: [] }));
   state.history = historyRes.items || [];
@@ -531,7 +526,6 @@ async function pollJob(jobId, statusNode) {
   }
 }
 
-/* ============================================================ system */
 async function renderSystem() {
   const res = await api.admin.system();
   const s = res.system;
@@ -563,9 +557,8 @@ async function renderSystem() {
   const cacheBtn = el("button", { class: "btn" }, icon("broom", { size: 15 }), el("span", { text: t("admin.sysClearCache") }));
   const cleanBtn = el("button", { class: "btn btn-danger" }, icon("trash", { size: 15 }), el("span", { text: t("admin.sysCleanup") }));
   cacheBtn.addEventListener("click", async () => {
-    const res2 = await api.admin.clearCache();
+    await api.admin.clearCache();
     toast(t("settings.cacheCleared"), "success");
-    void res2;
     renderSystem();
   });
   cleanBtn.addEventListener("click", async () => {
@@ -600,7 +593,6 @@ async function renderSystem() {
   }
 }
 
-/* ============================================================ boot */
 function showDenied() {
   dom.main.innerHTML = "";
   dom.main.append(
@@ -660,7 +652,7 @@ async function main() {
     try {
       tg.ready();
       tg.expand();
-    } catch { /* ignore */ }
+    } catch {}
   }
 
   await loadLanguage(guessLanguage(), { silent: true });
